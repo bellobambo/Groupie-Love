@@ -41,8 +41,15 @@ export default function UploadArtForm() {
   const [musicURI, setMusicURI] = useState("");
   const [priceEth, setPriceEth] = useState("0.01");
   const [availableMints, setAvailableMints] = useState(100);
-
   const [ipfsUploading, setIpfsUploading] = useState(false);
+
+  const isFormValid = Boolean(
+    title &&
+      artworkURI &&
+      priceEth &&
+      !isNaN(parseFloat(priceEth)) &&
+      availableMints > 0
+  );
 
   const handleUploadToIPFS = async (file: File) => {
     setIpfsUploading(true);
@@ -191,7 +198,10 @@ export default function UploadArtForm() {
               calls={calls}
               onStatus={handleOnStatus}
             >
-              <TransactionButton text="Upload Art" />
+              <TransactionButton
+                disabled={!isFormValid || ipfsUploading}
+                text="Upload Art"
+              />
               <TransactionSponsor />
               <TransactionStatus>
                 <TransactionStatusLabel />
