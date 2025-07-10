@@ -13,7 +13,7 @@ const inter = Space_Grotesk({ subsets: ["latin"], weight: ["400"] });
 
 export const metadata: Metadata = {
   title: "Groupiee Love 💙",
-  description: "Support your favorite artist",
+  description: "Support your favorite creatives",
 };
 
 export default async function RootLayout(props: { children: ReactNode }) {
@@ -24,12 +24,14 @@ export default async function RootLayout(props: { children: ReactNode }) {
   );
 
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <body
-        className={` bg-[url('/blob.svg')] bg-contain bg-center ${inter.className}`}
+        className={`min-h-screen flex flex-col bg-[url('/blob.svg')] ${inter.className}`}
       >
         <Header />
-        <Providers initialState={initialState}>{props.children}</Providers>
+        <Providers initialState={initialState}>
+          <main className="flex-1 overflow-y-auto">{props.children}</main>
+        </Providers>
       </body>
     </html>
   );
