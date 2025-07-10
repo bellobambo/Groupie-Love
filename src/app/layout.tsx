@@ -12,7 +12,7 @@ import Header from "./components/Header";
 const inter = Space_Grotesk({ subsets: ["latin"], weight: ["400"] });
 
 export const metadata: Metadata = {
-  title: "Groupiee Love",
+  title: "Groupiee Love 💙",
   description: "Support your favorite artist",
 };
 
