@@ -7,7 +7,7 @@ const Header = () => {
         style={{ fontWeight: "500" }}
         className="text-[30px]  text-white font-georgia"
       >
-        InnerCircle
+        Groupiee Love{" "}
       </p>
     </div>
   );
