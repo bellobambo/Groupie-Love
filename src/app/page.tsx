@@ -99,6 +99,12 @@ export default function UploadArtForm() {
   return (
     <div className="w-full max-w-screen-sm sm:max-w-screen-md md:max-w-screen-lg lg:max-w-[40%] px-4 sm:px-6 mx-auto space-y-8">
       {/* Wallet connection */}
+      {!address && (
+        <p className="text-sm sm:text-[15px] text-black font-semibold font-georgia text-center sm:text-right">
+          Connect Wallet to show some Groupiee Love💙!
+        </p>
+      )}
+      <br />
       {!address ? (
         <Wallet>
           <ConnectWallet>
