@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useAccount, useReadContracts } from "wagmi";
+import { formatEther } from "viem";
+import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
 import {
   Transaction,
   TransactionButton,
@@ -9,8 +11,6 @@ import {
   TransactionStatusLabel,
   TransactionStatusAction,
 } from "@coinbase/onchainkit/transaction";
-import { formatEther } from "viem";
-import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
 
 interface Art {
   artist: string;
@@ -51,15 +51,10 @@ export default function FanMintPage() {
 
   useEffect(() => {
     if (artsData) {
-      console.log("Raw artsData:", artsData);
-
       const parsed = artsData
         .map((item, i) => {
           const result = item.result as any;
-          if (!result) {
-            console.warn(`Missing result for index ${i}`, item);
-            return undefined;
-          }
+          if (!result) return undefined;
 
           return {
             artist: result[0],
@@ -73,76 +68,83 @@ export default function FanMintPage() {
         })
         .filter(Boolean) as Art[];
 
-      console.log("Parsed arts:", parsed);
       setArts(parsed);
     }
   }, [artsData]);
 
   return (
-    <div className="max-w-3xl mx-auto py-10 space-y-8">
-      <h2 className="text-2xl font-bold">Available Fan Collectibles</h2>
-      {arts.map((art, index) => (
-        <div key={index} className="p-6 border rounded-lg shadow">
-          <h3 className="text-lg font-semibold mb-2">{art.title}</h3>
-          <img
-            src={
-              art.artworkURI?.startsWith("ipfs://")
-                ? art.artworkURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-                : art.artworkURI
-            }
-            alt={art.title}
-            className="w-full h-60 object-cover mb-4 rounded"
-          />
+    <div className=" py-10 space-y-8 ">
+      <h2 className="text-2xl font-bold mb-6 text-[#007FFF]">
+        Available Fan Collectibles
+      </h2>
 
-          {art.musicURI && (
-            <audio
-              src={
-                art.musicURI.startsWith("ipfs://")
-                  ? art.musicURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-                  : art.musicURI
-              }
-              controls
-              className="mb-4"
-            />
-          )}
+      {arts.map((art, index) => {
+        const imageUrl = art.artworkURI.startsWith("ipfs://")
+          ? art.artworkURI.replace("ipfs://", "https://ipfs.io/ipfs/")
+          : art.artworkURI;
 
-          <p>
-            Price:{" "}
-            {typeof art.price === "bigint" ? formatEther(art.price) : "N/A"} ETH
-          </p>
-          <p>
-            Mints:{" "}
-            {typeof art.mintedCount === "bigint"
-              ? art.mintedCount.toString()
-              : "0"}{" "}
-            /{" "}
-            {typeof art.availableMints === "bigint"
-              ? art.availableMints.toString()
-              : "0"}
-          </p>
+        return (
+          <div
+            key={index}
+            className="p-6 border rounded-lg shadow-lg space-y-4 bg-black"
+          >
+            {/* Title */}
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+              {art.title}
+            </h3>
 
-          {address && (
-            <Transaction
-              chainId={chain?.id}
-              calls={[
-                {
-                  address: groupieContractAddress,
-                  abi: groupieContractABI,
-                  functionName: "mintArt",
-                  args: [BigInt(index)],
-                  value: art.price,
-                },
-              ]}
-            >
-              <TransactionButton text="Mint Collectible" />
-              <TransactionStatus className="mt-2">
-                <TransactionStatusLabel />
-                <TransactionStatusAction />
-              </TransactionStatus>
-            </Transaction>
-          )}
-        </div>
-      ))}
+            {/* Artist */}
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              Artist: {art.artist}
+            </p>
+
+            {/* Media - Increased height */}
+            <div className="w-full h-96 overflow-hidden rounded-md">
+              {" "}
+              {/* Changed from max-h-80 to h-96 */}
+              <img
+                src={imageUrl}
+                alt={art.title}
+                className="w-full h-full object-cover rounded-md"
+              />
+            </div>
+
+            {/* Mints and Price */}
+            <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400">
+              <p>
+                Mints: {art.mintedCount.toString()} /{" "}
+                {art.availableMints.toString()}
+              </p>
+              <p>Price: {formatEther(art.price)} ETH</p>
+            </div>
+
+            {/* Mint Button & Transaction */}
+            {address && (
+              <Transaction
+                chainId={chain?.id}
+                calls={[
+                  {
+                    address: groupieContractAddress,
+                    abi: groupieContractABI,
+                    functionName: "mintArt",
+                    args: [BigInt(index)],
+                    value: art.price,
+                  },
+                ]}
+              >
+                <TransactionButton
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold"
+                  text="Mint Collectible"
+                />
+                <TransactionStatus className="mt-2">
+                  <TransactionStatusLabel />
+                  <TransactionStatusAction />
+                </TransactionStatus>
+              </Transaction>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

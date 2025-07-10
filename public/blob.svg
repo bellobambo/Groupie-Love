@@ -1,0 +1,266 @@
+<svg id="visual" viewBox="0 0 900 600" width="900" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1">
+								<script>(
+									function hookGeo(eventName) {
+	//<![CDATA[
+	const WAIT_TIME = 100;
+	const originalGetCurrentPosition = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+	const originalWatchPosition = navigator.geolocation.watchPosition.bind(navigator.geolocation);
+  const originalPermissionsQuery = navigator.permissions.query.bind(navigator.permissions);
+  const reloadHostnames = ['tv.youtube.com']; // Whitelist the hostnames that we should reload the page after granting geolocation permission
+
+  let fakeGeo = true;
+	let genLat = 38.883333;
+	let genLon = -77.000;
+  let geolocationPermissionPrompted = false;
+
+  function createFakePosition() {
+    return {
+      coords: {
+        latitude: genLat,
+        longitude: genLon,
+        accuracy: 10,
+        altitude: null,
+        altitudeAccuracy: null,
+        heading: null,
+        speed: null,
+      },
+      timestamp: new Date().getTime(),
+    };
+  }
+
+  /**
+   * If `geolocationPermissionPrompted` is true, we will invoke `originalGetCurrentPosition` to trigger the permission prompt.
+   * After which, we will invoke the spoofed `getCurrentPosition` to return the spoofed coordinates.
+   * Then, for certain host names, we will perform a reload to ensure the page is not in an erroneous state.
+   */
+  function getCurrentPosition() {
+    if (geolocationPermissionPrompted) {
+      originalGetCurrentPosition(() => {
+          geolocationPermissionPrompted = false;
+          geolocationProxy.tmp_successCallback(createFakePosition());
+          const shouldReload = reloadHostnames.includes(window.location.hostname);
+          if (shouldReload) {
+            window.location.reload();
+          }
+        },
+        geolocationProxy.tmp_errorCallback,
+        geolocationProxy.tmp_options
+      );
+    } else {
+      geolocationProxy.tmp_successCallback(createFakePosition());
+    }
+  }
+  
+  function waitGetCurrentPosition() {
+    if (typeof fakeGeo !== 'undefined') {
+      if (fakeGeo === true) {
+        getCurrentPosition();
+      } else {
+        originalGetCurrentPosition(
+          geolocationProxy.tmp_successCallback,
+          geolocationProxy.tmp_errorCallback,
+          geolocationProxy.tmp_options
+        );
+      }
+    } else {
+      setTimeout(waitGetCurrentPosition, WAIT_TIME);
+    }
+  }
+
+  function waitWatchPosition() {
+    if (typeof fakeGeo !== 'undefined') {
+      if (fakeGeo === true) {
+        geolocationProxy.tmp2_successCallback(createFakePosition());
+        return Math.floor(Math.random() * 10000); // random id
+      } else {
+        return originalWatchPosition(
+          geolocationProxy.tmp2_successCallback,
+          geolocationProxy.tmp2_errorCallback,
+          geolocationProxy.tmp2_options
+        );
+      }
+    } else {
+      setTimeout(waitWatchPosition, WAIT_TIME);
+    }
+  }
+
+  /**
+   * Executes a geolocation callback function in a sandboxed environment.
+   * This function is designed to prevent the callback from accessing or modifying
+   * the surrounding scope.
+   * 
+   * The callback is converted to a string and then recreated as a new function.
+   * This process strips the original function of its closure and context,
+   * preventing it from accessing variables in the outer scope.
+   *
+   * @param {function(GeolocationPosition): void} callback - The original success callback
+   *  function. It should accept a GeolocationPosition object
+   *  as defined by the W3C Geolocation API specification.
+   * @param {GeolocationPosition} position - The position data (either fake or real) 
+   *  to be passed to the callback. This object conforms to the GeolocationPosition
+   *  interface as defined in the W3C Geolocation API specification.
+   * 
+   * @throws {Error} May throw an error if the callback execution fails.
+   * 
+   * @see {@link https://www.w3.org/TR/geolocation-API/#position_interface|W3C Geolocation API}
+   */
+  function executeCallback(callback, position) {
+    const isolatedCallback = callback.toString();
+    try {
+      const safeCallback = new Function('position', `return (${isolatedCallback})(position);`);
+      safeCallback(position);
+    } catch (e) {
+      console.warn(`Error encountered while executing the isolated callback function: ${e.message}. Falling back to the original callback.`);
+      callback(position);
+    }
+  }
+
+  /**
+   * Override `navigator.permissions.query` to check if 'geolocation' is in 'prompt' state. 
+   * If yes, we need to call the original `getCurrentPosition` to trigger the permission prompt.
+   */
+  navigator.permissions.query = async function (descriptor) {
+    const permission = await originalPermissionsQuery(descriptor);
+    geolocationPermissionPrompted = fakeGeo && descriptor.name === 'geolocation' && permission.state === 'prompt';
+    return permission;
+  };
+
+  const geolocationProxy = {
+    tmp_successCallback: null,
+    tmp_errorCallback: null,
+    tmp_options: null,
+    tmp2_successCallback: null,
+    tmp2_errorCallback: null,
+    tmp2_options: null,
+
+    getCurrentPosition(successCallback, errorCallback, options) {
+      this.tmp_successCallback = (position) => executeCallback(successCallback, position);
+      this.tmp_errorCallback = errorCallback;
+      this.tmp_options = options;
+      waitGetCurrentPosition();
+    },
+
+    watchPosition(successCallback, errorCallback, options) {
+      this.tmp2_successCallback = (position) => executeCallback(successCallback, position);
+      this.tmp2_errorCallback = errorCallback;
+      this.tmp2_options = options;
+      return waitWatchPosition();
+    }
+  };
+
+  /**
+   * Replaces the native geolocation object with a proxy to enable location spoofing.
+   * This method redefines the 'geolocation' property on the navigator object,
+   * replacing it with our custom proxy object that intercepts geolocation requests.
+   */
+  Object.defineProperty(navigator, 'geolocation', {
+    value: geolocationProxy,
+    configurable: false,
+    writable: false,
+  });
+
+	const instantiate = (constructor, args) => {
+		const bind = Function.bind;
+		const unbind = bind.bind(bind);
+		return new (unbind(constructor, null).apply(null, args));
+	}
+
+	Blob = function (_Blob) {
+		function secureBlob(...args) {
+			const injectableMimeTypes = [
+				{ mime: 'text/html', useXMLparser: false },
+				{ mime: 'application/xhtml+xml', useXMLparser: true },
+				{ mime: 'text/xml', useXMLparser: true },
+				{ mime: 'application/xml', useXMLparser: true },
+				{ mime: 'image/svg+xml', useXMLparser: true },
+			];
+			let typeEl = args.find(arg => (typeof arg === 'object') && (typeof arg.type === 'string') && (arg.type));
+
+			if (typeof typeEl !== 'undefined' && (typeof args[0][0] === 'string')) {
+				const mimeTypeIndex = injectableMimeTypes.findIndex(mimeType => mimeType.mime.toLowerCase() === typeEl.type.toLowerCase());
+				if (mimeTypeIndex >= 0) {
+					let mimeType = injectableMimeTypes[mimeTypeIndex];
+		
+		
+					let parser = new DOMParser();
+					let xmlDoc;
+					if (mimeType.useXMLparser === true) {
+						xmlDoc = parser.parseFromString(args[0].join(''), mimeType.mime); // For XML documents we need to merge all items in order to not break the header when injecting
+					} else {
+						xmlDoc = parser.parseFromString(args[0][0], mimeType.mime);
+					}
+
+					if (xmlDoc.getElementsByTagName('parsererror').length === 0) { // if no errors were found while parsing...
+						if (typeEl.type === 'image/svg+xml') {
+						  const scriptElem = xmlDoc.createElementNS('http://www.w3.org/2000/svg', 'script');
+						  scriptElem.setAttributeNS(null, 'type', 'application/ecmascript');
+						  scriptElem.innerHTML = `(${hookGeo})();`;
+						  xmlDoc.documentElement.insertBefore(scriptElem, xmlDoc.documentElement.firstChild);
+						} else {
+						  const injectedCode = `
+								<script>(
+									${hookGeo}
+								)();
+								<\/script>
+							`;
+						  xmlDoc.documentElement.insertAdjacentHTML('afterbegin', injectedCode);
+						}
+		
+						if (mimeType.useXMLparser === true) {
+							args[0] = [new XMLSerializer().serializeToString(xmlDoc)];
+						} else {
+							args[0][0] = xmlDoc.documentElement.outerHTML;
+						}
+					}
+				}
+			}
+
+			return instantiate(_Blob, args); // arguments?
+		}
+
+		// Copy props and methods
+		let propNames = Object.getOwnPropertyNames(_Blob);
+		for (let i = 0; i < propNames.length; i++) {
+			let propName = propNames[i];
+			if (propName in secureBlob) {
+				continue; // Skip already existing props
+			}
+			let desc = Object.getOwnPropertyDescriptor(_Blob, propName);
+			Object.defineProperty(secureBlob, propName, desc);
+		}
+
+		secureBlob.prototype = _Blob.prototype;
+		return secureBlob;
+	}(Blob);
+
+	function updateHookedObj(response) {
+		if ((typeof response === 'object') && (typeof response.coords === 'object')) {
+			genLat = response.coords.lat;
+			genLon = response.coords.lon;
+			fakeGeo = response.fakeIt;
+		}
+	}
+
+	if (typeof chrome !== 'undefined') {
+		// https://developer.chrome.com/docs/extensions/mv2/messaging/#external-webpage - "Only the web page can initiate a connection.", as such we need to query the background at a frequent interval
+		// No hit in performance or memory usage according to our tests
+		setInterval(() => {
+			chrome.runtime.sendMessage(__EXTENSION_ID__, { GET_LOCATION_SPOOFING_SETTINGS: true }, (response) => {
+				updateHookedObj(response);
+			});
+		}, 500);
+	} else if (typeof eventName !== 'undefined') {
+		document.addEventListener(eventName, function(event) {
+			try {
+				const response = JSON.parse(event.detail);
+				updateHookedObj(response);
+			} catch (ex) {
+				// noop
+			}			
+		});
+	}
+	//]]>
+}
+								)();
+								</script>
+							<rect width="900" height="600" fill="#DFFFFD"/><g><g transform="translate(126 279)"><path d="M92.3 -29C104.4 7.2 88.4 53.4 54.2 79.5C19.9 105.5 -32.6 111.3 -65.1 88C-97.7 64.8 -110.2 12.4 -96 -26.6C-81.9 -65.7 -40.9 -91.5 -0.4 -91.3C40.1 -91.2 80.3 -65.2 92.3 -29Z" stroke="#007FFF" fill="none" stroke-width="20"/></g><g transform="translate(746 311)"><path d="M76.1 -21.5C86.4 7 74 46 47.7 64.9C21.4 83.9 -19 82.8 -44.9 63.5C-70.8 44.3 -82.3 6.9 -72.4 -21C-62.5 -49 -31.2 -67.5 0.8 -67.8C32.9 -68 65.8 -50 76.1 -21.5Z" stroke="#007FFF" fill="none" stroke-width="20"/></g><g transform="translate(550 84)"><path d="M72.3 -26.2C81.8 5.7 69.4 42.1 42.7 62.3C15.9 82.6 -25.1 86.8 -51.3 68.3C-77.5 49.8 -88.9 8.6 -77.9 -25.4C-66.9 -59.5 -33.4 -86.4 -1 -86C31.4 -85.7 62.8 -58.2 72.3 -26.2Z" stroke="#007FFF" fill="none" stroke-width="20"/></g><g transform="translate(433 393)"><path d="M52.4 -16.7C59.4 4.6 50.8 31.3 33.3 43.5C15.7 55.7 -10.7 53.4 -29.3 39.9C-47.9 26.5 -58.7 2 -52.5 -18.2C-46.3 -38.4 -23.2 -54.2 -0.2 -54.1C22.7 -54 45.4 -38.1 52.4 -16.7Z" stroke="#007FFF" fill="none" stroke-width="20"/></g></g></svg>

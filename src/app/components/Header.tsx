@@ -1,7 +1,16 @@
 import React from "react";
 
 const Header = () => {
-  return <div className="w-full bg-[#A5B4F9] h-[8vh] mb-8">Groupiee Love</div>;
+  return (
+    <div className="w-full bg-[#007FFF] h-[8vh] mb-8 flex items-center py-4 px-4">
+      <p
+        style={{ fontWeight: "500" }}
+        className="text-[30px]  text-white font-georgia"
+      >
+        InnerCircle
+      </p>
+    </div>
+  );
 };
 
 export default Header;

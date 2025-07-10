@@ -30,6 +30,12 @@ import { groupieContractABI, groupieContractAddress } from "./GroupieABI";
 import { parseEther } from "viem";
 import FanMintPage from "./components/FanMintPage";
 import MyCollectibles from "./components/MyCollectibles";
+import { LiaMicrophoneSolid } from "react-icons/lia";
+import { PiGuitarThin } from "react-icons/pi";
+import { GiGuitarBassHead } from "react-icons/gi";
+import { HiOutlinePaintBrush } from "react-icons/hi2";
+import { CiHeart } from "react-icons/ci";
+import { BsHourglass } from "react-icons/bs";
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
@@ -39,8 +45,8 @@ export default function UploadArtForm() {
   const [title, setTitle] = useState(""); // 🔧 NEW state
   const [artworkURI, setArtworkURI] = useState("");
   const [musicURI, setMusicURI] = useState("");
-  const [priceEth, setPriceEth] = useState("0.01");
-  const [availableMints, setAvailableMints] = useState(100);
+  const [priceEth, setPriceEth] = useState("");
+  const [availableMints, setAvailableMints] = useState("");
   const [ipfsUploading, setIpfsUploading] = useState(false);
 
   const isFormValid = Boolean(
@@ -48,7 +54,7 @@ export default function UploadArtForm() {
       artworkURI &&
       priceEth &&
       !isNaN(parseFloat(priceEth)) &&
-      availableMints > 0
+      availableMints
   );
 
   const handleUploadToIPFS = async (file: File) => {
@@ -91,7 +97,13 @@ export default function UploadArtForm() {
   }, []);
 
   return (
-    <div className="max-w-xl mx-auto space-y-8">
+    <div className="w-full  max-w-[45%] ml-[10rem] px-4 md:px-6 space-y-8">
+      {/* <PiGuitarThin size={100} />
+      <HiOutlinePaintBrush size={100} />
+      <CiHeart size={100} />
+      <BsHourglass size={100} />
+      <LiaMicrophoneSolid size={100} /> */}
+
       {!address ? (
         <Wallet>
           <ConnectWallet>
@@ -126,24 +138,31 @@ export default function UploadArtForm() {
           </Wallet>
 
           <form
-            className="space-y-4"
+            className="space-y-4 p-6 bg-white rounded-xl w-full shadow-lg border border-[#007FFF]/30 text-sm text-[#0B1B2B]"
             onSubmit={(e) => {
               e.preventDefault();
             }}
           >
-            <div>
-              <label>Art Title:</label> {/* 🔧 NEW input */}
+            {/* Art Title */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#007FFF]">
+                Art Title
+              </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Fire & Soul"
                 required
+                className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition-all"
               />
             </div>
 
-            <div>
-              <label>Artwork Image:</label>
+            {/* Artwork Image */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#007FFF]">
+                Artwork Image
+              </label>
               <input
                 type="file"
                 accept="image/*"
@@ -155,11 +174,15 @@ export default function UploadArtForm() {
                   }
                 }}
                 disabled={ipfsUploading}
+                className="w-full px-3 py-2 bg-white/80 border border-dashed border-[#007FFF]/40 rounded-md text-sm cursor-pointer file:cursor-pointer"
               />
             </div>
 
-            <div>
-              <label>Music File:</label>
+            {/* Music File */}
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#007FFF]">
+                Music File
+              </label>
               <input
                 type="file"
                 accept="audio/*"
@@ -171,28 +194,38 @@ export default function UploadArtForm() {
                   }
                 }}
                 disabled={ipfsUploading}
+                className="w-full px-3 py-2 bg-white/80 border border-dashed border-[#007FFF]/40 rounded-md text-sm cursor-pointer file:cursor-pointer"
               />
             </div>
 
-            <div>
-              <label>Price (in ETH):</label>
-              <input
-                type="number"
-                step="0.001"
-                value={priceEth}
-                onChange={(e) => setPriceEth(e.target.value)}
-              />
+            {/* Price & Mints */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#007FFF]">
+                  Price (ETH)
+                </label>
+                <input
+                  type="number"
+                  step="0.0001"
+                  value={priceEth}
+                  onChange={(e) => setPriceEth(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-[#007FFF]">
+                  Available Mints
+                </label>
+                <input
+                  type="number"
+                  value={availableMints}
+                  onChange={(e) => setAvailableMints(e.target.value)}
+                  className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md"
+                />
+              </div>
             </div>
 
-            <div>
-              <label>Available Mints:</label>
-              <input
-                type="number"
-                value={availableMints}
-                onChange={(e) => setAvailableMints(Number(e.target.value))}
-              />
-            </div>
-
+            {/* Submit Transaction */}
             <Transaction
               chainId={BASE_SEPOLIA_CHAIN_ID}
               calls={calls}
@@ -200,10 +233,11 @@ export default function UploadArtForm() {
             >
               <TransactionButton
                 disabled={!isFormValid || ipfsUploading}
-                text="Upload Art"
+                text="🚀 Upload Art"
+                className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc] transition-all"
               />
               <TransactionSponsor />
-              <TransactionStatus>
+              <TransactionStatus className="mt-2 text-xs text-gray-600">
                 <TransactionStatusLabel />
                 <TransactionStatusAction />
               </TransactionStatus>
@@ -213,7 +247,6 @@ export default function UploadArtForm() {
       )}
 
       <FanMintPage />
-
       <MyCollectibles />
     </div>
   );

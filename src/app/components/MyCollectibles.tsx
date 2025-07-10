@@ -11,6 +11,14 @@ import {
   TransactionStatusLabel,
   TransactionStatusAction,
 } from "@coinbase/onchainkit/transaction";
+import { NFTCard } from "@coinbase/onchainkit/nft";
+import {
+  NFTMedia,
+  NFTTitle,
+  NFTOwner,
+  NFTLastSoldPrice,
+  NFTNetwork,
+} from "@coinbase/onchainkit/nft/view";
 
 interface Art {
   artist: string;
@@ -144,20 +152,30 @@ export default function MyCollectibles() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-10 space-y-8">
+    <div className=" py-10 space-y-8 w-full  max-w-[100%] ">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">My Collectibles</h2>
+        <h2 className="text-2xl font-bold text-black [text-shadow:_0_0_8px_white]">
+          My Collectibles
+        </h2>
         <button
           onClick={refreshData}
           disabled={isRefreshing}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-blue-300"
+          className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center justify-center gap-2"
         >
-          {isRefreshing ? "Refreshing..." : "Refresh Data"}
+          {isRefreshing ? (
+            <>
+              <span className="animate-spin">&#x1F504;</span> Refreshing...
+            </>
+          ) : (
+            <div className="w-[30%]">&#x1F504; </div>
+          )}
         </button>
       </div>
 
       {isRefreshing && (
-        <div className="text-center py-4">Loading your collectibles...</div>
+        <div className="text-center py-4 text-white">
+          Loading your collectibles...
+        </div>
       )}
 
       {!isRefreshing &&
@@ -171,64 +189,87 @@ export default function MyCollectibles() {
             : art.musicURI || null;
 
           return (
-            <div key={i} className="p-6 border rounded-lg shadow">
-              <h3 className="text-lg font-semibold mb-1">{art.title}</h3>
-              <p className="text-sm text-gray-500 mb-3">
-                Artist: <code>{art.artist}</code>
-              </p>
-
-              {artworkSrc && (
-                <>
-                  <img
-                    src={artworkSrc}
-                    alt={art.title}
-                    className="w-full h-60 object-cover mb-2 rounded"
-                  />
-                  <button
-                    onClick={() =>
-                      downloadFile(
-                        artworkSrc,
-                        `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
-                      )
-                    }
-                    className="btn-download"
-                    disabled={isRefreshing}
+            <div
+              key={i}
+              className="p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white  overflow-y-auto flex flex-col"
+            >
+              <div>
+                <h3 className="text-lg font-semibold text-white">
+                  {art.title}
+                </h3>
+                <p className="text-sm text-gray-500 mb-3 flex items-center gap-2 py-2">
+                  Artist:{" "}
+                  <code
+                    className="cursor-pointer select-all"
+                    title={art.artist}
+                    onClick={() => navigator.clipboard.writeText(art.artist)}
                   >
-                    Download Artwork
-                  </button>
-                </>
-              )}
+                    &#128257;{" "}
+                    {art.artist.length > 12
+                      ? `${art.artist.slice(0, 5)}...${art.artist.slice(-5)}`
+                      : art.artist}
+                  </code>
+                </p>
 
-              {musicSrc && (
-                <>
-                  <audio src={musicSrc} controls className="mb-2" />
-                  <button
-                    onClick={() =>
-                      downloadFile(
-                        musicSrc,
-                        `${art.title.replace(/\s+/g, "_")}_music.mp3`
-                      )
-                    }
-                    className="btn-download"
-                    disabled={isRefreshing}
-                  >
-                    Download Music
-                  </button>
-                </>
-              )}
+                {artworkSrc && (
+                  <>
+                    <img
+                      src={artworkSrc}
+                      alt={art.title}
+                      className="w-full max-h-48 object-cover mb-2 rounded-md"
+                    />
+                    <button
+                      onClick={() =>
+                        downloadFile(
+                          artworkSrc,
+                          `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
+                        )
+                      }
+                      disabled={isRefreshing}
+                      className="py-1 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
+                    >
+                      Download Artwork
+                    </button>
+                  </>
+                )}
 
-              <p>Price: {formatEther(art.price)} ETH</p>
-              <p className="font-medium text-green-600">
-                You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
-              </p>
+                {musicSrc && (
+                  <>
+                    <audio
+                      src={musicSrc}
+                      controls
+                      className="mb-2 w-full rounded max-h-20"
+                    />
+                    <button
+                      onClick={() =>
+                        downloadFile(
+                          musicSrc,
+                          `${art.title.replace(/\s+/g, "_")}_music.mp3`
+                        )
+                      }
+                      disabled={isRefreshing}
+                      className="py-1 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
+                    >
+                      Download Music
+                    </button>
+                  </>
+                )}
 
-              {ownedCount > 0 && (
-                <div className="mt-4 space-y-2">
-                  <h4 className="font-medium">Transfer Ownership</h4>
+                <p className="text-sm text-white">
+                  Price: {formatEther(art.price)} ETH
+                </p>
+                <p className="font-medium text-green-600">
+                  You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
+                </p>
+              </div>
+
+              {/* {ownedCount > 0 && (
+                <div className="mt-4 space-y-3 flex-shrink-0">
+                  <h4 className="font-medium text-white">Transfer Ownership</h4>
 
                   {ownedCount > 1 && (
-                    <div className="mb-2">
-                      <label className="block text-sm mb-1">
+                    <div>
+                      <label className="block text-sm mb-1 text-[#007FFF] font-medium">
                         Copies to transfer:
                       </label>
                       <select
@@ -244,7 +285,7 @@ export default function MyCollectibles() {
                             amount: parseInt(e.target.value),
                           })
                         }
-                        className="w-full p-2 border rounded"
+                        className="w-full p-2 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition"
                         disabled={isRefreshing}
                       >
                         {Array.from({ length: ownedCount }, (_, i) => (
@@ -259,7 +300,7 @@ export default function MyCollectibles() {
                   <input
                     type="text"
                     placeholder="Recipient address (0x...)"
-                    className="w-full p-2 border rounded"
+                    className="w-full p-2 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition"
                     onChange={(e) =>
                       setTransferData({
                         ...transferData,
@@ -279,9 +320,7 @@ export default function MyCollectibles() {
                     chainId={BASE_SEPOLIA_CHAIN_ID}
                     calls={transferCalls}
                     onSuccess={() => {
-                      alert(
-                        `Successfully transferred ${transferData.amount} copy/copies!`
-                      );
+                      alert(`Successfully transferred!`);
                       setTransferData({});
                       refreshData();
                     }}
@@ -298,16 +337,16 @@ export default function MyCollectibles() {
                           ? "ies"
                           : ""
                       }`}
-                      className="  mt-2 w-full "
+                      className="mt-2 w-full bg-[#007FFF] text-white rounded-md py-2 font-medium hover:bg-[#0066cc] disabled:bg-[#A0C4FF]"
                       disabled={isRefreshing}
                     />
-                    <TransactionStatus className="mt-2">
+                    <TransactionStatus className="mt-2 text-xs text-gray-600">
                       <TransactionStatusLabel />
                       <TransactionStatusAction />
                     </TransactionStatus>
                   </Transaction>
                 </div>
-              )}
+              )} */}
             </div>
           );
         })}

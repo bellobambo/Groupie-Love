@@ -1,1 +1,6 @@
 @import "tailwindcss";
+
+
+.nftcard-no-link a {
+    @apply pointer-events-none cursor-default;
+}
