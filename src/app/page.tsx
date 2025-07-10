@@ -162,7 +162,7 @@ export default function UploadArtForm() {
             {/* Artwork Image */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#007FFF]">
-                Artwork Image
+                Artwork
               </label>
               <input
                 type="file"
@@ -182,7 +182,7 @@ export default function UploadArtForm() {
             {/* Music File */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#007FFF]">
-                Music File
+                Audio File(optional)
               </label>
               <input
                 type="file"
