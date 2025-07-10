@@ -97,13 +97,8 @@ export default function UploadArtForm() {
   }, []);
 
   return (
-    <div className="w-full  max-w-[45%] ml-[10rem] px-4 md:px-6 space-y-8">
-      {/* <PiGuitarThin size={100} />
-      <HiOutlinePaintBrush size={100} />
-      <CiHeart size={100} />
-      <BsHourglass size={100} />
-      <LiaMicrophoneSolid size={100} /> */}
-
+    <div className="w-full max-w-screen-sm sm:max-w-screen-md md:max-w-screen-lg lg:max-w-[40%] px-4 sm:px-6 mx-auto space-y-8">
+      {/* Wallet connection */}
       {!address ? (
         <Wallet>
           <ConnectWallet>
@@ -138,7 +133,7 @@ export default function UploadArtForm() {
           </Wallet>
 
           <form
-            className="space-y-4 p-6 bg-white rounded-xl w-full shadow-lg border border-[#007FFF]/30 text-sm text-[#0B1B2B]"
+            className="space-y-4 p-4 sm:p-6 bg-white rounded-xl w-full shadow-lg border border-[#007FFF]/30 text-sm text-[#0B1B2B]"
             onSubmit={(e) => {
               e.preventDefault();
             }}
@@ -199,7 +194,7 @@ export default function UploadArtForm() {
             </div>
 
             {/* Price & Mints */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-medium text-[#007FFF]">
                   Price (ETH)

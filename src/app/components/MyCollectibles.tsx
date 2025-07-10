@@ -152,28 +152,30 @@ export default function MyCollectibles() {
   }
 
   return (
-    <div className=" py-10 space-y-8 w-full  max-w-[100%] ">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold text-black [text-shadow:_0_0_8px_white]">
+    <div className="py-10 space-y-8 w-full px-4 sm:px-6 max-w-screen-lg mx-auto">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <h2 className="text-2xl sm:text-3xl font-bold text-black [text-shadow:_0_0_8px_white]">
           My Collectibles
         </h2>
         <button
           onClick={refreshData}
           disabled={isRefreshing}
-          className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center justify-center gap-2"
+          className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center gap-2"
         >
           {isRefreshing ? (
             <>
               <span className="animate-spin">&#x1F504;</span> Refreshing...
             </>
           ) : (
-            <div className="w-[30%]">&#x1F504; </div>
+            <>
+              <span>&#x1F504;</span> Refresh
+            </>
           )}
         </button>
       </div>
 
       {isRefreshing && (
-        <div className="text-center py-4 text-white">
+        <div className="text-center py-4 text-gray-600">
           Loading your collectibles...
         </div>
       )}
@@ -191,17 +193,14 @@ export default function MyCollectibles() {
           return (
             <div
               key={i}
-              className="p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white  overflow-y-auto flex flex-col"
+              className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
             >
               <div>
-                <h3 className="text-lg font-semibold text-white">
-                  {art.title}
-                </h3>
-                <p className="text-sm text-gray-500 mb-3 flex items-center gap-2 py-2">
+                <h3 className="text-lg font-semibold">{art.title}</h3>
+                <p className="text-sm text-gray-400 mb-2">
                   Artist:{" "}
                   <code
                     className="cursor-pointer select-all"
-                    title={art.artist}
                     onClick={() => navigator.clipboard.writeText(art.artist)}
                   >
                     &#128257;{" "}
@@ -216,7 +215,7 @@ export default function MyCollectibles() {
                     <img
                       src={artworkSrc}
                       alt={art.title}
-                      className="w-full max-h-48 object-cover mb-2 rounded-md"
+                      className="w-full max-h-48 object-cover rounded-md mb-2"
                     />
                     <button
                       onClick={() =>
@@ -226,7 +225,7 @@ export default function MyCollectibles() {
                         )
                       }
                       disabled={isRefreshing}
-                      className="py-1 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
+                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
                     >
                       Download Artwork
                     </button>
@@ -238,7 +237,7 @@ export default function MyCollectibles() {
                     <audio
                       src={musicSrc}
                       controls
-                      className="mb-2 w-full rounded max-h-20"
+                      className="w-full rounded max-h-20 mb-2"
                     />
                     <button
                       onClick={() =>
@@ -248,105 +247,20 @@ export default function MyCollectibles() {
                         )
                       }
                       disabled={isRefreshing}
-                      className="py-1 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
+                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
                     >
                       Download Music
                     </button>
                   </>
                 )}
 
-                <p className="text-sm text-white">
+                <p className="text-sm text-white mt-1">
                   Price: {formatEther(art.price)} ETH
                 </p>
-                <p className="font-medium text-green-600">
+                <p className="font-medium text-green-500">
                   You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
                 </p>
               </div>
-
-              {/* {ownedCount > 0 && (
-                <div className="mt-4 space-y-3 flex-shrink-0">
-                  <h4 className="font-medium text-white">Transfer Ownership</h4>
-
-                  {ownedCount > 1 && (
-                    <div>
-                      <label className="block text-sm mb-1 text-[#007FFF] font-medium">
-                        Copies to transfer:
-                      </label>
-                      <select
-                        value={
-                          transferData.artKey === artKey
-                            ? transferData.amount || 1
-                            : 1
-                        }
-                        onChange={(e) =>
-                          setTransferData({
-                            artKey,
-                            toAddress: transferData.toAddress,
-                            amount: parseInt(e.target.value),
-                          })
-                        }
-                        className="w-full p-2 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition"
-                        disabled={isRefreshing}
-                      >
-                        {Array.from({ length: ownedCount }, (_, i) => (
-                          <option key={i + 1} value={i + 1}>
-                            {i + 1} copy{i + 1 > 1 ? "ies" : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-
-                  <input
-                    type="text"
-                    placeholder="Recipient address (0x...)"
-                    className="w-full p-2 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition"
-                    onChange={(e) =>
-                      setTransferData({
-                        ...transferData,
-                        artKey,
-                        toAddress: e.target.value,
-                      })
-                    }
-                    value={
-                      transferData.artKey === artKey
-                        ? transferData.toAddress || ""
-                        : ""
-                    }
-                    disabled={isRefreshing}
-                  />
-
-                  <Transaction
-                    chainId={BASE_SEPOLIA_CHAIN_ID}
-                    calls={transferCalls}
-                    onSuccess={() => {
-                      alert(`Successfully transferred!`);
-                      setTransferData({});
-                      refreshData();
-                    }}
-                    onError={() => refreshData()}
-                  >
-                    <TransactionButton
-                      text={`Transfer ${
-                        transferData.artKey === artKey
-                          ? transferData.amount || 1
-                          : 1
-                      } copy${
-                        transferData.artKey === artKey &&
-                        (transferData.amount || 1) > 1
-                          ? "ies"
-                          : ""
-                      }`}
-                      className="mt-2 w-full bg-[#007FFF] text-white rounded-md py-2 font-medium hover:bg-[#0066cc] disabled:bg-[#A0C4FF]"
-                      disabled={isRefreshing}
-                    />
-                    <TransactionStatus className="mt-2 text-xs text-gray-600">
-                      <TransactionStatusLabel />
-                      <TransactionStatusAction />
-                    </TransactionStatus>
-                  </Transaction>
-                </div>
-              )} */}
             </div>
           );
         })}
