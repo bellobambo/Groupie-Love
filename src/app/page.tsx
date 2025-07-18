@@ -44,6 +44,7 @@ export default function UploadArtForm() {
 
   const [title, setTitle] = useState(""); // 🔧 NEW state
   const [artworkURI, setArtworkURI] = useState("");
+  const [artistName, setArtistName] = useState("");
   const [musicURI, setMusicURI] = useState("");
   const [priceEth, setPriceEth] = useState("");
   const [availableMints, setAvailableMints] = useState("");
@@ -84,8 +85,9 @@ export default function UploadArtForm() {
       functionName: "uploadArt",
       args: [
         title,
+        artistName,
+        musicURI || "",
         artworkURI,
-        musicURI,
         parseEther(priceEth),
         BigInt(availableMints),
       ],
@@ -100,8 +102,8 @@ export default function UploadArtForm() {
     <div className="w-full max-w-screen-sm sm:max-w-screen-md md:max-w-screen-lg lg:max-w-[40%] px-4 sm:px-6 mx-auto space-y-8">
       {/* Wallet connection */}
       {!address && (
-        <p className="text-sm sm:text-[15px] text-black font-semibold font-georgia text-center sm:text-right">
-          Connect Wallet to show some Groupiee Love💙!
+        <p className="text-sm sm:text-[15px] text-white mt-[3rem] font-semibold font-georgia text-center sm:text-right">
+          Connect Wallet to show some Groupiee Love 💙!
         </p>
       )}
       <br />
@@ -144,6 +146,20 @@ export default function UploadArtForm() {
               e.preventDefault();
             }}
           >
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-[#007FFF]">
+                Artist Name
+              </label>
+              <input
+                type="text"
+                value={artistName}
+                onChange={(e) => setArtistName(e.target.value)}
+                placeholder="e.g. SZA"
+                required
+                className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md focus:ring-2 focus:ring-[#007FFF] outline-none transition-all"
+              />
+            </div>
+
             {/* Art Title */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#007FFF]">

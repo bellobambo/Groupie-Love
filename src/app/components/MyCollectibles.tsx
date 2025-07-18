@@ -1,146 +1,143 @@
 "use client";
 
 import { useAccount, useReadContracts } from "wagmi";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
-import { formatEther } from "viem";
+import { formatEther, isAddress } from "viem";
+
 import {
   Transaction,
   TransactionButton,
   TransactionStatus,
   TransactionStatusLabel,
   TransactionStatusAction,
+  TransactionSponsor,
 } from "@coinbase/onchainkit/transaction";
-import { NFTCard } from "@coinbase/onchainkit/nft";
-import {
-  NFTMedia,
-  NFTTitle,
-  NFTOwner,
-  NFTLastSoldPrice,
-  NFTNetwork,
-} from "@coinbase/onchainkit/nft/view";
 
 interface Art {
-  artist: string;
   title: string;
-  artworkURI: string;
-  musicURI: string;
-  price: bigint;
+  artistName: string;
+  artistWallet: string;
+  mediaUrl: string;
+  previewImage: string;
+  priceInWei: bigint;
+  totalMinted: bigint;
+  maxSupply: bigint;
 }
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 export default function MyCollectibles() {
-  const { address, chain } = useAccount();
-
+  const { address } = useAccount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [ownedArts, setOwnedArts] = useState<
-    { art: Art; artKey: string; ownedCount: number; tokenIds: bigint[] }[]
+    { art: Art; artId: bigint; ownedCount: number }[]
   >([]);
-  const [transferData, setTransferData] = useState<{
-    artKey?: string;
-    toAddress?: string;
-    amount?: number;
+  const [transferInputs, setTransferInputs] = useState<{
+    [artId: string]: { toAddress: string; amount: string };
   }>({});
 
-  // Step 1: Get token IDs
-  const tokenIdsResult = useReadContracts({
-    contracts: address
-      ? [
-          {
-            address: groupieContractAddress,
-            abi: groupieContractABI,
-            functionName: "getFanTokens",
-            args: [address],
-          },
-        ]
+  const artCountResult = useReadContracts({
+    contracts: [
+      {
+        address: groupieContractAddress,
+        abi: groupieContractABI,
+        functionName: "getArtCount",
+      },
+    ],
+  });
+
+  const artCount = artCountResult.data?.[0]?.result as bigint | undefined;
+
+  const balanceResults = useReadContracts({
+    contracts: artCount
+      ? Array.from({ length: Number(artCount) }, (_, i) => ({
+          address: groupieContractAddress,
+          abi: groupieContractABI,
+          functionName: "balanceOf",
+          args: [address, i],
+        }))
       : [],
   });
 
-  const tokenIds = tokenIdsResult.data?.[0]?.result as bigint[] | undefined;
-
-  // Step 2: For each token ID, get metadata
-  const tokenArtResult = useReadContracts({
-    contracts:
-      tokenIds?.map((tokenId) => ({
-        address: groupieContractAddress,
-        abi: groupieContractABI,
-        functionName: "tokenArt",
-        args: [tokenId],
-      })) ?? [],
+  const artDetailsResults = useReadContracts({
+    contracts: balanceResults.data
+      ? balanceResults.data
+          .map((res, i) => ({
+            hasBalance: (res.result as bigint) > 0n,
+            artId: i,
+          }))
+          .filter(({ hasBalance }) => hasBalance)
+          .map(({ artId }) => ({
+            address: groupieContractAddress,
+            abi: groupieContractABI,
+            functionName: "getArt",
+            args: [artId],
+          }))
+      : [],
   });
 
-  // Refresh data function
   const refreshData = async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([tokenIdsResult.refetch(), tokenArtResult.refetch()]);
+      await Promise.all([
+        artCountResult.refetch(),
+        balanceResults.refetch(),
+        artDetailsResults.refetch(),
+      ]);
     } finally {
       setIsRefreshing(false);
     }
   };
 
-  // Step 3: Group by metadata content but keep track of token IDs
   useEffect(() => {
-    if (tokenArtResult.data && tokenIds) {
-      const grouped = new Map<
-        string,
-        { art: Art; ownedCount: number; tokenIds: bigint[] }
-      >();
+    if (artDetailsResults.data && balanceResults.data && artCount) {
+      const artsWithBalance = balanceResults.data
+        .map((res, i) => ({
+          balance: res.result as bigint,
+          artId: BigInt(i),
+        }))
+        .filter(({ balance }) => balance > 0n);
 
-      tokenArtResult.data.forEach((res, index) => {
-        const result = res.result as any;
-        if (!result || result.length < 5) return;
-
-        const art: Art = {
-          artist: result[0],
-          title: result[1],
-          artworkURI: result[2],
-          musicURI: result[3],
-          price: BigInt(result[4]),
+      const owned = artDetailsResults.data.map((res, i) => {
+        const artData = res.result as any;
+        return {
+          art: {
+            title: artData[0],
+            artistName: artData[1],
+            artistWallet: artData[2],
+            mediaUrl: artData[3],
+            previewImage: artData[4],
+            priceInWei: BigInt(artData[5]),
+            totalMinted: BigInt(artData[6]),
+            maxSupply: BigInt(artData[7]),
+          },
+          artId: artsWithBalance[i].artId,
+          ownedCount: Number(artsWithBalance[i].balance),
         };
-
-        const artKey = `${art.title}|${art.artworkURI}|${art.musicURI}|${art.price}`;
-        const tokenId = tokenIds[index];
-
-        if (!grouped.has(artKey)) {
-          grouped.set(artKey, { art, ownedCount: 1, tokenIds: [tokenId] });
-        } else {
-          const existing = grouped.get(artKey)!;
-          existing.ownedCount += 1;
-          existing.tokenIds.push(tokenId);
-        }
       });
 
-      setOwnedArts(
-        Array.from(grouped.values()).map((g) => ({
-          ...g,
-          artKey: g.art.title,
-        }))
-      );
+      setOwnedArts(owned);
     }
-  }, [tokenArtResult.data, tokenIds]);
+  }, [artDetailsResults.data, balanceResults.data, artCount]);
 
-  // Prepare transfer transactions
-  const transferCalls = (() => {
-    if (!transferData.artKey || !transferData.toAddress || !transferData.amount)
-      return [];
+  const handleOnStatus = useCallback((status: any) => {
+    console.log("Transaction status:", status);
+  }, []);
 
-    const art = ownedArts.find((a) => a.artKey === transferData.artKey);
-    if (
-      !art ||
-      transferData.amount <= 0 ||
-      transferData.amount > art.tokenIds.length
-    )
-      return [];
-
-    return art.tokenIds.slice(0, transferData.amount).map((tokenId) => ({
-      address: groupieContractAddress,
-      abi: groupieContractABI,
-      functionName: "transferFrom",
-      args: [address, transferData.toAddress, tokenId],
+  const handleInputChange = (
+    artId: bigint,
+    field: "toAddress" | "amount",
+    value: string
+  ) => {
+    setTransferInputs((prev) => ({
+      ...prev,
+      [artId.toString()]: {
+        ...prev[artId.toString()],
+        [field]: value,
+      },
     }));
-  })();
+  };
 
   function downloadFile(url: string, filename: string) {
     const link = document.createElement("a");
@@ -154,7 +151,7 @@ export default function MyCollectibles() {
   return (
     <div className="py-10 space-y-8 w-full px-4 sm:px-6 max-w-screen-lg mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl sm:text-3xl font-bold text-black [text-shadow:_0_0_8px_white]">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF] ">
           My Collectibles
         </h2>
         <button
@@ -163,47 +160,28 @@ export default function MyCollectibles() {
           className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center gap-2"
         >
           {isRefreshing ? (
-            <>
-              <svg
-                className="animate-spin h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <svg
-                className="h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+            <svg
+              className="animate-spin h-5 w-5 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
                 stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </>
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          ) : (
+            <>Refresh</>
           )}
         </button>
       </div>
@@ -214,113 +192,152 @@ export default function MyCollectibles() {
         </div>
       ) : ownedArts.length === 0 ? (
         <div className="text-center py-10 space-y-4">
-          <svg
-            className="mx-auto h-16 w-16 text-gray-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1}
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-            />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900">
+          <h3 className="text-lg font-medium text-[#007FFF]">
             No collectibles yet
           </h3>
           <p className="text-gray-500">Mint an NFT to start your collection</p>
-          <button
-            onClick={() => {
-              /* Add your mint function here */
-            }}
-            className="mt-4 px-4 py-2 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] transition"
-          >
-            Mint NFT
-          </button>
         </div>
       ) : (
-        ownedArts.map(({ art, ownedCount, tokenIds, artKey }, i) => {
-          const artworkSrc = art.artworkURI?.startsWith("ipfs://")
-            ? art.artworkURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.artworkURI || null;
+        ownedArts.map(({ art, ownedCount, artId }) => {
+          const inputs = transferInputs[artId.toString()] || {
+            toAddress: "",
+            amount: "",
+          };
 
-          const musicSrc = art.musicURI?.startsWith("ipfs://")
-            ? art.musicURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.musicURI || null;
+          const isAddressValid = isAddress(inputs.toAddress);
+          const amount = parseInt(inputs.amount, 10);
+          const isAmountValid =
+            Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
+
+          const calls =
+            isAddressValid && isAmountValid
+              ? [
+                  {
+                    address: groupieContractAddress,
+                    abi: groupieContractABI,
+                    functionName: "transferArt",
+                    args: [inputs.toAddress, artId, amount],
+                  },
+                ]
+              : [];
+
+          const previewSrc = art.previewImage?.startsWith("ipfs://")
+            ? art.previewImage.replace("ipfs://", "https://ipfs.io/ipfs/")
+            : art.previewImage;
+
+          const mediaSrc = art.mediaUrl?.startsWith("ipfs://")
+            ? art.mediaUrl.replace("ipfs://", "https://ipfs.io/ipfs/")
+            : art.mediaUrl;
 
           return (
             <div
-              key={i}
+              key={artId.toString()}
               className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
             >
-              <div>
-                <h3 className="text-lg font-semibold">{art.title}</h3>
-                <p className="text-sm text-gray-400 mb-2">
-                  Artist:{" "}
-                  <code
-                    className="cursor-pointer select-all"
-                    onClick={() => navigator.clipboard.writeText(art.artist)}
+              <h3 className="text-lg font-semibold">{art.title}</h3>
+              <p className="text-sm text-gray-400">
+                Artist:{" "}
+                <span
+                  className="cursor-pointer"
+                  onClick={() => navigator.clipboard.writeText(art.artistName)}
+                >
+                  {art.artistName}
+                </span>
+              </p>
+
+              {previewSrc && (
+                <div>
+                  <img
+                    src={previewSrc}
+                    alt={art.title}
+                    className="w-full max-h-48 object-cover rounded-md mb-2"
+                  />
+                  <button
+                    onClick={() =>
+                      downloadFile(
+                        previewSrc,
+                        `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
+                      )
+                    }
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc]"
                   >
-                    &#128257;{" "}
-                    {art.artist.length > 12
-                      ? `${art.artist.slice(0, 5)}...${art.artist.slice(-5)}`
-                      : art.artist}
-                  </code>
-                </p>
+                    Download Artwork
+                  </button>
+                </div>
+              )}
 
-                {artworkSrc && (
-                  <>
-                    <img
-                      src={artworkSrc}
-                      alt={art.title}
-                      className="w-full max-h-48 object-cover rounded-md mb-2"
-                    />
-                    <button
-                      onClick={() =>
-                        downloadFile(
-                          artworkSrc,
-                          `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
-                        )
-                      }
-                      disabled={isRefreshing}
-                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
-                    >
-                      Download Artwork
-                    </button>
-                  </>
-                )}
+              {mediaSrc && (
+                <div>
+                  <audio
+                    controls
+                    src={mediaSrc}
+                    className="w-full rounded max-h-20 mb-2"
+                  />
+                  <button
+                    onClick={() =>
+                      downloadFile(
+                        mediaSrc,
+                        `${art.title.replace(/\s+/g, "_")}_media.mp3`
+                      )
+                    }
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc]"
+                  >
+                    Download Media
+                  </button>
+                </div>
+              )}
 
-                {musicSrc && (
-                  <>
-                    <audio
-                      src={musicSrc}
-                      controls
-                      className="w-full rounded max-h-20 mb-2"
-                    />
-                    <button
-                      onClick={() =>
-                        downloadFile(
-                          musicSrc,
-                          `${art.title.replace(/\s+/g, "_")}_music.mp3`
-                        )
-                      }
-                      disabled={isRefreshing}
-                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
-                    >
-                      Download Music
-                    </button>
-                  </>
-                )}
+              <p className="text-sm">
+                Price: {formatEther(art.priceInWei)} ETH
+              </p>
+              <p className="text-sm">
+                Minted: {art.totalMinted.toString()} /{" "}
+                {art.maxSupply.toString()}
+              </p>
+              <p className="text-green-500">
+                You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
+              </p>
 
-                <p className="text-sm text-white mt-1">
-                  Price: {formatEther(art.price)} ETH
-                </p>
-                <p className="font-medium text-green-500">
-                  You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
-                </p>
+              <div className="space-y-2 mt-4 text-black">
+                <input
+                  type="text"
+                  placeholder="Recipient address (0x...)"
+                  value={inputs.toAddress}
+                  onChange={(e) =>
+                    handleInputChange(artId, "toAddress", e.target.value)
+                  }
+                  className={`w-full px-3 py-2 rounded ${
+                    isAddressValid ? "border-green-500" : "border-red-500"
+                  } border`}
+                />
+                <input
+                  type="number"
+                  placeholder="Amount"
+                  value={inputs.amount}
+                  onChange={(e) =>
+                    handleInputChange(artId, "amount", e.target.value)
+                  }
+                  className={`w-full px-3 py-2 rounded ${
+                    isAmountValid ? "border-green-500" : "border-red-500"
+                  } border`}
+                />
+
+                <Transaction
+                  chainId={BASE_SEPOLIA_CHAIN_ID}
+                  calls={calls}
+                  onStatus={handleOnStatus}
+                >
+                  <TransactionButton
+                    text="🚀 Transfer NFT"
+                    disabled={calls.length === 0}
+                    className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc]"
+                  />
+                  <TransactionSponsor />
+                  <TransactionStatus className="text-xs mt-2 text-gray-300">
+                    <TransactionStatusLabel />
+                    <TransactionStatusAction />
+                  </TransactionStatus>
+                </Transaction>
               </div>
             </div>
           );
@@ -328,8 +345,4 @@ export default function MyCollectibles() {
       )}
     </div>
   );
-}
-
-function isValidAddress(address: string) {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
 }

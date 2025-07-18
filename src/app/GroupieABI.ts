@@ -1,5 +1,5 @@
 export const groupieContractAddress =
-  "0x8FB27CcBf6C343a268CA014E7C77959e2ff63834" as `0x${string}`;
+  "0x34a608794e6B2E61e5c68E264eF198D416E26137" as `0x${string}`;
 
 export const groupieContractABI = [
   {
@@ -13,32 +13,7 @@ export const groupieContractABI = [
       {
         indexed: true,
         internalType: "address",
-        name: "owner",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "address",
-        name: "approved",
-        type: "address",
-      },
-      {
-        indexed: true,
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "Approval",
-    type: "event",
-  },
-  {
-    anonymous: false,
-    inputs: [
-      {
-        indexed: true,
-        internalType: "address",
-        name: "owner",
+        name: "account",
         type: "address",
       },
       {
@@ -68,30 +43,49 @@ export const groupieContractABI = [
       },
       {
         indexed: true,
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-      {
-        indexed: true,
         internalType: "address",
-        name: "fan",
-        type: "address",
-      },
-      {
-        indexed: false,
-        internalType: "address",
-        name: "artist",
+        name: "buyer",
         type: "address",
       },
       {
         indexed: false,
         internalType: "uint256",
-        name: "price",
+        name: "amount",
         type: "uint256",
       },
     ],
     name: "ArtMinted",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "artId",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "address",
+        name: "to",
+        type: "address",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "amount",
+        type: "uint256",
+      },
+    ],
+    name: "ArtTransferred",
     type: "event",
   },
   {
@@ -114,30 +108,6 @@ export const groupieContractABI = [
         internalType: "string",
         name: "title",
         type: "string",
-      },
-      {
-        indexed: false,
-        internalType: "string",
-        name: "artworkURI",
-        type: "string",
-      },
-      {
-        indexed: false,
-        internalType: "string",
-        name: "musicURI",
-        type: "string",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "price",
-        type: "uint256",
-      },
-      {
-        indexed: false,
-        internalType: "uint256",
-        name: "availableMints",
-        type: "uint256",
       },
     ],
     name: "ArtUploaded",
@@ -168,6 +138,12 @@ export const groupieContractABI = [
       {
         indexed: true,
         internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
         name: "from",
         type: "address",
       },
@@ -178,32 +154,76 @@ export const groupieContractABI = [
         type: "address",
       },
       {
-        indexed: true,
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
+        indexed: false,
+        internalType: "uint256[]",
+        name: "ids",
+        type: "uint256[]",
+      },
+      {
+        indexed: false,
+        internalType: "uint256[]",
+        name: "values",
+        type: "uint256[]",
       },
     ],
-    name: "Transfer",
+    name: "TransferBatch",
     type: "event",
   },
   {
+    anonymous: false,
     inputs: [
       {
+        indexed: true,
+        internalType: "address",
+        name: "operator",
+        type: "address",
+      },
+      {
+        indexed: true,
+        internalType: "address",
+        name: "from",
+        type: "address",
+      },
+      {
+        indexed: true,
         internalType: "address",
         name: "to",
         type: "address",
       },
       {
+        indexed: false,
         internalType: "uint256",
-        name: "tokenId",
+        name: "id",
+        type: "uint256",
+      },
+      {
+        indexed: false,
+        internalType: "uint256",
+        name: "value",
         type: "uint256",
       },
     ],
-    name: "approve",
-    outputs: [],
-    stateMutability: "nonpayable",
-    type: "function",
+    name: "TransferSingle",
+    type: "event",
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: "string",
+        name: "value",
+        type: "string",
+      },
+      {
+        indexed: true,
+        internalType: "uint256",
+        name: "id",
+        type: "uint256",
+      },
+    ],
+    name: "URI",
+    type: "event",
   },
   {
     inputs: [
@@ -216,38 +236,43 @@ export const groupieContractABI = [
     name: "arts",
     outputs: [
       {
-        internalType: "address payable",
-        name: "artist",
-        type: "address",
-      },
-      {
         internalType: "string",
         name: "title",
         type: "string",
       },
       {
         internalType: "string",
-        name: "artworkURI",
+        name: "artistName",
+        type: "string",
+      },
+      {
+        internalType: "address",
+        name: "artistWallet",
+        type: "address",
+      },
+      {
+        internalType: "string",
+        name: "mediaUrl",
         type: "string",
       },
       {
         internalType: "string",
-        name: "musicURI",
+        name: "previewImage",
         type: "string",
       },
       {
         internalType: "uint256",
-        name: "price",
+        name: "priceInWei",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "availableMints",
+        name: "totalMinted",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "mintedCount",
+        name: "maxSupply",
         type: "uint256",
       },
     ],
@@ -258,8 +283,13 @@ export const groupieContractABI = [
     inputs: [
       {
         internalType: "address",
-        name: "owner",
+        name: "account",
         type: "address",
+      },
+      {
+        internalType: "uint256",
+        name: "id",
+        type: "uint256",
       },
     ],
     name: "balanceOf",
@@ -276,55 +306,17 @@ export const groupieContractABI = [
   {
     inputs: [
       {
-        internalType: "address",
-        name: "",
-        type: "address",
+        internalType: "address[]",
+        name: "accounts",
+        type: "address[]",
       },
       {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
+        internalType: "uint256[]",
+        name: "ids",
+        type: "uint256[]",
       },
     ],
-    name: "fanTokens",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "getApproved",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "fan",
-        type: "address",
-      },
-    ],
-    name: "getFanTokens",
+    name: "balanceOfBatch",
     outputs: [
       {
         internalType: "uint256[]",
@@ -338,8 +330,82 @@ export const groupieContractABI = [
   {
     inputs: [
       {
+        internalType: "uint256",
+        name: "_artId",
+        type: "uint256",
+      },
+    ],
+    name: "getArt",
+    outputs: [
+      {
+        components: [
+          {
+            internalType: "string",
+            name: "title",
+            type: "string",
+          },
+          {
+            internalType: "string",
+            name: "artistName",
+            type: "string",
+          },
+          {
+            internalType: "address",
+            name: "artistWallet",
+            type: "address",
+          },
+          {
+            internalType: "string",
+            name: "mediaUrl",
+            type: "string",
+          },
+          {
+            internalType: "string",
+            name: "previewImage",
+            type: "string",
+          },
+          {
+            internalType: "uint256",
+            name: "priceInWei",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "totalMinted",
+            type: "uint256",
+          },
+          {
+            internalType: "uint256",
+            name: "maxSupply",
+            type: "uint256",
+          },
+        ],
+        internalType: "struct FanMintCollectibles.Art",
+        name: "",
+        type: "tuple",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "getArtCount",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
         internalType: "address",
-        name: "owner",
+        name: "account",
         type: "address",
       },
       {
@@ -363,7 +429,12 @@ export const groupieContractABI = [
     inputs: [
       {
         internalType: "uint256",
-        name: "artId",
+        name: "_artId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
         type: "uint256",
       },
     ],
@@ -374,65 +445,7 @@ export const groupieContractABI = [
   },
   {
     inputs: [],
-    name: "name",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "nextArtId",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
-    name: "nextTokenId",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [],
     name: "owner",
-    outputs: [
-      {
-        internalType: "address",
-        name: "",
-        type: "address",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "ownerOf",
     outputs: [
       {
         internalType: "address",
@@ -463,12 +476,22 @@ export const groupieContractABI = [
         type: "address",
       },
       {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
+        internalType: "uint256[]",
+        name: "ids",
+        type: "uint256[]",
+      },
+      {
+        internalType: "uint256[]",
+        name: "amounts",
+        type: "uint256[]",
+      },
+      {
+        internalType: "bytes",
+        name: "data",
+        type: "bytes",
       },
     ],
-    name: "safeTransferFrom",
+    name: "safeBatchTransferFrom",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -487,7 +510,12 @@ export const groupieContractABI = [
       },
       {
         internalType: "uint256",
-        name: "tokenId",
+        name: "id",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "amount",
         type: "uint256",
       },
       {
@@ -539,102 +567,7 @@ export const groupieContractABI = [
     type: "function",
   },
   {
-    inputs: [],
-    name: "symbol",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
     inputs: [
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "tokenArt",
-    outputs: [
-      {
-        internalType: "address",
-        name: "artist",
-        type: "address",
-      },
-      {
-        internalType: "string",
-        name: "title",
-        type: "string",
-      },
-      {
-        internalType: "string",
-        name: "artworkURI",
-        type: "string",
-      },
-      {
-        internalType: "string",
-        name: "musicURI",
-        type: "string",
-      },
-      {
-        internalType: "uint256",
-        name: "price",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    name: "tokenToArt",
-    outputs: [
-      {
-        internalType: "uint256",
-        name: "",
-        type: "uint256",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "uint256",
-        name: "tokenId",
-        type: "uint256",
-      },
-    ],
-    name: "tokenURI",
-    outputs: [
-      {
-        internalType: "string",
-        name: "",
-        type: "string",
-      },
-    ],
-    stateMutability: "view",
-    type: "function",
-  },
-  {
-    inputs: [
-      {
-        internalType: "address",
-        name: "from",
-        type: "address",
-      },
       {
         internalType: "address",
         name: "to",
@@ -642,11 +575,16 @@ export const groupieContractABI = [
       },
       {
         internalType: "uint256",
-        name: "tokenId",
+        name: "_artId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
         type: "uint256",
       },
     ],
-    name: "transferFrom",
+    name: "transferArt",
     outputs: [],
     stateMutability: "nonpayable",
     type: "function",
@@ -668,33 +606,57 @@ export const groupieContractABI = [
     inputs: [
       {
         internalType: "string",
-        name: "title",
+        name: "_title",
         type: "string",
       },
       {
         internalType: "string",
-        name: "artworkURI",
+        name: "_artistName",
         type: "string",
       },
       {
         internalType: "string",
-        name: "musicURI",
+        name: "_mediaUrl",
+        type: "string",
+      },
+      {
+        internalType: "string",
+        name: "_previewImage",
         type: "string",
       },
       {
         internalType: "uint256",
-        name: "price",
+        name: "_priceInEther",
         type: "uint256",
       },
       {
         internalType: "uint256",
-        name: "availableMints",
+        name: "_maxSupply",
         type: "uint256",
       },
     ],
     name: "uploadArt",
     outputs: [],
     stateMutability: "nonpayable",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    name: "uri",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
+      },
+    ],
+    stateMutability: "view",
     type: "function",
   },
 ] as const;
