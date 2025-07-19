@@ -1,160 +1,355 @@
 "use client";
 
 import { useAccount, useReadContracts } from "wagmi";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
-import { formatEther } from "viem";
+import { formatEther, isAddress } from "viem";
+import { Music, Image as ImageIcon, Video, FileWarning } from "lucide-react";
+
 import {
   Transaction,
   TransactionButton,
   TransactionStatus,
   TransactionStatusLabel,
   TransactionStatusAction,
+  TransactionSponsor,
 } from "@coinbase/onchainkit/transaction";
-import { NFTCard } from "@coinbase/onchainkit/nft";
-import {
-  NFTMedia,
-  NFTTitle,
-  NFTOwner,
-  NFTLastSoldPrice,
-  NFTNetwork,
-} from "@coinbase/onchainkit/nft/view";
 
 interface Art {
-  artist: string;
   title: string;
-  artworkURI: string;
-  musicURI: string;
-  price: bigint;
+  artistName: string;
+  artistWallet: string;
+  mediaUrl: string;
+  previewImage: string;
+  priceInWei: bigint;
+  totalMinted: bigint;
+  maxSupply: bigint;
 }
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
-export default function MyCollectibles() {
-  const { address, chain } = useAccount();
+// MediaRenderer component moved outside the main component
+const MediaRenderer = ({
+  src,
+  type,
+  isPreview = false,
+}: {
+  src: string;
+  type: string;
+  isPreview?: boolean;
+}) => {
+  const [hasError, setHasError] = useState(false);
 
+  if (!src || hasError)
+    return <MediaFallback type={isPreview ? "preview" : type} />;
+
+  const handleError = () => setHasError(true);
+
+  try {
+    switch (type) {
+      case "image":
+        return (
+          <img
+            src={src}
+            alt={isPreview ? "NFT Preview" : "NFT Media"}
+            className={`w-full ${
+              isPreview ? "max-h-48" : "max-h-64"
+            } object-contain rounded-md`}
+            onError={handleError}
+          />
+        );
+      case "audio":
+        return (
+          <audio
+            controls
+            src={src}
+            className="w-full rounded"
+            onError={handleError}
+          />
+        );
+      case "video":
+        return (
+          <video
+            controls
+            src={src}
+            className={`w-full ${
+              isPreview ? "max-h-48" : "max-h-64"
+            } rounded-md`}
+            onError={handleError}
+          />
+        );
+      default:
+        return <MediaFallback type={isPreview ? "preview" : "media"} />;
+    }
+  } catch (e) {
+    console.error("Error rendering media:", e);
+    return <MediaFallback type={isPreview ? "preview" : "media"} />;
+  }
+};
+
+// Fallback component for failed media
+const MediaFallback = ({ type = "media" }: { type?: string }) => {
+  let message = "Media not available";
+  let Icon = FileWarning;
+
+  if (type === "audio") {
+    message = "Audio not available";
+    Icon = Music;
+  } else if (type === "video") {
+    message = "Video not available";
+    Icon = Video;
+  } else if (type === "image" || type === "preview") {
+    message = "Image not available";
+    Icon = ImageIcon;
+  }
+
+  return (
+    <div className="w-full h-48 bg-gray-800 rounded-md flex flex-col items-center justify-center gap-2">
+      <Icon className="w-8 h-8 text-gray-400" />
+      <span className="text-sm text-gray-400">{message}</span>
+    </div>
+  );
+};
+
+export default function MyCollectibles() {
+  const { address } = useAccount();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [ownedArts, setOwnedArts] = useState<
-    { art: Art; artKey: string; ownedCount: number; tokenIds: bigint[] }[]
+    { art: Art; artId: bigint; ownedCount: number }[]
   >([]);
-  const [transferData, setTransferData] = useState<{
-    artKey?: string;
-    toAddress?: string;
-    amount?: number;
+  const [transferInputs, setTransferInputs] = useState<{
+    [artId: string]: { toAddress: string; amount: string };
   }>({});
 
-  // Step 1: Get token IDs
-  const tokenIdsResult = useReadContracts({
-    contracts: address
-      ? [
-          {
-            address: groupieContractAddress,
-            abi: groupieContractABI,
-            functionName: "getFanTokens",
-            args: [address],
-          },
-        ]
-      : [],
-  });
-
-  const tokenIds = tokenIdsResult.data?.[0]?.result as bigint[] | undefined;
-
-  // Step 2: For each token ID, get metadata
-  const tokenArtResult = useReadContracts({
-    contracts:
-      tokenIds?.map((tokenId) => ({
+  // Fetch art count
+  const artCountResult = useReadContracts({
+    contracts: [
+      {
         address: groupieContractAddress,
         abi: groupieContractABI,
-        functionName: "tokenArt",
-        args: [tokenId],
-      })) ?? [],
+        functionName: "getArtCount",
+      },
+    ],
   });
 
-  // Refresh data function
-  const refreshData = async () => {
+  const artCount = useMemo(() => {
+    const count = artCountResult.data?.[0]?.result;
+    return count !== undefined ? BigInt(count) : 0n;
+  }, [artCountResult.data]);
+
+  // Fetch balances
+  const balanceResults = useReadContracts({
+    contracts:
+      artCount > 0n
+        ? Array.from({ length: Number(artCount) }, (_, i) => ({
+            address: groupieContractAddress,
+            abi: groupieContractABI,
+            functionName: "balanceOf",
+            args: [address, i],
+          }))
+        : [],
+  });
+
+  // Prepare contracts for art details
+  const artDetailsContracts = useMemo(() => {
+    if (!balanceResults.data || !artCount) return [];
+
+    return balanceResults.data
+      .map((res, i) => ({
+        hasBalance: res.result ? BigInt(res.result) > 0n : false,
+        artId: i,
+      }))
+      .filter(({ hasBalance }) => hasBalance)
+      .map(({ artId }) => ({
+        address: groupieContractAddress,
+        abi: groupieContractABI,
+        functionName: "getArt",
+        args: [artId],
+      }));
+  }, [balanceResults.data, artCount]);
+
+  // Fetch art details
+  const artDetailsResults = useReadContracts({
+    contracts: artDetailsContracts,
+  });
+
+  const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([tokenIdsResult.refetch(), tokenArtResult.refetch()]);
+      await Promise.all([artCountResult.refetch(), balanceResults.refetch()]);
     } finally {
       setIsRefreshing(false);
     }
+  }, [artCountResult, balanceResults]);
+
+  // Process owned arts
+  useEffect(() => {
+    if (!artDetailsResults.data || !balanceResults.data || artCount === 0n) {
+      setOwnedArts([]);
+      return;
+    }
+
+    const processedArts = artDetailsResults.data
+      .map((res, index) => {
+        if (!res.result) return null;
+
+        const artId = artDetailsContracts[index]?.args?.[0];
+        if (artId === undefined) return null;
+
+        const balanceRes = balanceResults.data?.[Number(artId)];
+        const balance = balanceRes?.result ? BigInt(balanceRes.result) : 0n;
+
+        if (balance === 0n) return null;
+
+        const artData = res.result as any;
+        console.log("Fetched NFT data:", artData);
+
+        try {
+          return {
+            art: {
+              title: artData.title || artData[0] || "Untitled",
+              artistName: artData.artistName || artData[1] || "Unknown Artist",
+              artistWallet: artData.artistWallet || artData[2] || address || "",
+              mediaUrl: artData.mediaUrl || artData[3] || "",
+              previewImage: artData.previewImage || artData[4] || "",
+              priceInWei:
+                artData.price || artData.priceInWei || artData[5]
+                  ? BigInt(artData.price || artData.priceInWei || artData[5])
+                  : 0n,
+              totalMinted:
+                artData.totalMinted || artData[6]
+                  ? BigInt(artData.totalMinted || artData[6])
+                  : 0n,
+              maxSupply:
+                artData.maxSupply || artData[7]
+                  ? BigInt(artData.maxSupply || artData[7])
+                  : 0n,
+            },
+            artId: BigInt(artId),
+            ownedCount: Number(balance),
+          };
+        } catch (error) {
+          console.error("Error processing art data:", error, artData);
+          return null;
+        }
+      })
+      .filter(Boolean) as { art: Art; artId: bigint; ownedCount: number }[];
+
+    setOwnedArts(processedArts);
+  }, [
+    artDetailsResults.data,
+    balanceResults.data,
+    artCount,
+    artDetailsContracts,
+    address,
+  ]);
+
+  // Improved IPFS URL handler with multiple gateways
+  const getIpfsUrl = (ipfsUri: string) => {
+    if (!ipfsUri) return "";
+    if (ipfsUri.startsWith("ipfs://")) {
+      const cid = ipfsUri.replace("ipfs://", "");
+      // Try multiple gateways
+      const gateways = [
+        `https://ipfs.io/ipfs/${cid}`,
+        `https://cloudflare-ipfs.com/ipfs/${cid}`,
+        `https://dweb.link/ipfs/${cid}`,
+        `https://gateway.pinata.cloud/ipfs/${cid}`,
+      ];
+      return gateways[0]; // Start with first gateway
+    }
+    return ipfsUri;
   };
 
-  // Step 3: Group by metadata content but keep track of token IDs
-  useEffect(() => {
-    if (tokenArtResult.data && tokenIds) {
-      const grouped = new Map<
-        string,
-        { art: Art; ownedCount: number; tokenIds: bigint[] }
-      >();
-
-      tokenArtResult.data.forEach((res, index) => {
-        const result = res.result as any;
-        if (!result || result.length < 5) return;
-
-        const art: Art = {
-          artist: result[0],
-          title: result[1],
-          artworkURI: result[2],
-          musicURI: result[3],
-          price: BigInt(result[4]),
-        };
-
-        const artKey = `${art.title}|${art.artworkURI}|${art.musicURI}|${art.price}`;
-        const tokenId = tokenIds[index];
-
-        if (!grouped.has(artKey)) {
-          grouped.set(artKey, { art, ownedCount: 1, tokenIds: [tokenId] });
-        } else {
-          const existing = grouped.get(artKey)!;
-          existing.ownedCount += 1;
-          existing.tokenIds.push(tokenId);
-        }
-      });
-
-      setOwnedArts(
-        Array.from(grouped.values()).map((g) => ({
-          ...g,
-          artKey: g.art.title,
-        }))
-      );
+  // Enhanced media type detection
+  const getMediaType = (url: string) => {
+    if (!url) return "unknown";
+    try {
+      const pathname = new URL(url).pathname;
+      const extension = pathname.split(".").pop()?.toLowerCase() || "";
+      if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension)) {
+        return "image";
+      } else if (["mp3", "wav", "ogg"].includes(extension)) {
+        return "audio";
+      } else if (["mp4", "webm", "mov"].includes(extension)) {
+        return "video";
+      }
+    } catch (e) {
+      console.error("Error parsing media URL:", url, e);
     }
-  }, [tokenArtResult.data, tokenIds]);
+    return "unknown";
+  };
 
-  // Prepare transfer transactions
-  const transferCalls = (() => {
-    if (!transferData.artKey || !transferData.toAddress || !transferData.amount)
-      return [];
+  const handleOnStatus = useCallback(
+    (status: any) => {
+      console.log("Transaction status:", status);
+      if (status === "success") {
+        refreshData();
+      }
+    },
+    [refreshData]
+  );
 
-    const art = ownedArts.find((a) => a.artKey === transferData.artKey);
-    if (
-      !art ||
-      transferData.amount <= 0 ||
-      transferData.amount > art.tokenIds.length
-    )
-      return [];
-
-    return art.tokenIds.slice(0, transferData.amount).map((tokenId) => ({
-      address: groupieContractAddress,
-      abi: groupieContractABI,
-      functionName: "transferFrom",
-      args: [address, transferData.toAddress, tokenId],
+  const handleInputChange = (
+    artId: bigint,
+    field: "toAddress" | "amount",
+    value: string
+  ) => {
+    setTransferInputs((prev) => ({
+      ...prev,
+      [artId.toString()]: {
+        ...prev[artId.toString()],
+        [field]: value,
+      },
     }));
-  })();
+  };
 
   function downloadFile(url: string, filename: string) {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!url) return;
+
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
   }
+
+  // Prepare all calls outside the render loop
+  const allCalls = useMemo(() => {
+    return ownedArts.map(({ artId }) => {
+      const inputs = transferInputs[artId.toString()] || {
+        toAddress: "",
+        amount: "",
+      };
+
+      const isAddressValid = isAddress(inputs.toAddress);
+      const amount = BigInt(inputs.amount || "0");
+
+      const ownedCount =
+        ownedArts.find((a) => a.artId === artId)?.ownedCount || 0;
+      const isAmountValid =
+        Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
+
+      return isAddressValid && isAmountValid
+        ? {
+            address: groupieContractAddress,
+            abi: groupieContractABI,
+            functionName: "transferArt",
+            args: [inputs.toAddress, artId, amount],
+          }
+        : null;
+    });
+  }, [ownedArts, transferInputs]);
 
   return (
     <div className="py-10 space-y-8 w-full px-4 sm:px-6 max-w-screen-lg mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl sm:text-3xl font-bold text-black [text-shadow:_0_0_8px_white]">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF]">
           My Collectibles
         </h2>
         <button
@@ -163,47 +358,28 @@ export default function MyCollectibles() {
           className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center gap-2"
         >
           {isRefreshing ? (
-            <>
-              <svg
-                className="animate-spin h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                ></circle>
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                ></path>
-              </svg>
-              Refreshing...
-            </>
-          ) : (
-            <>
-              <svg
-                className="h-5 w-5 text-white"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
+            <svg
+              className="animate-spin h-5 w-5 text-white"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
                 stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              Refresh
-            </>
+                strokeWidth="4"
+              ></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              ></path>
+            </svg>
+          ) : (
+            <>Refresh</>
           )}
         </button>
       </div>
@@ -214,122 +390,171 @@ export default function MyCollectibles() {
         </div>
       ) : ownedArts.length === 0 ? (
         <div className="text-center py-10 space-y-4">
-          <svg
-            className="mx-auto h-16 w-16 text-gray-400"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={1}
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-            />
-          </svg>
-          <h3 className="text-lg font-medium text-gray-900">
+          <h3 className="text-lg font-medium text-[#007FFF]">
             No collectibles yet
           </h3>
           <p className="text-gray-500">Mint an NFT to start your collection</p>
-          <button
-            onClick={() => {
-              /* Add your mint function here */
-            }}
-            className="mt-4 px-4 py-2 bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] transition"
-          >
-            Mint NFT
-          </button>
         </div>
       ) : (
-        ownedArts.map(({ art, ownedCount, tokenIds, artKey }, i) => {
-          const artworkSrc = art.artworkURI?.startsWith("ipfs://")
-            ? art.artworkURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.artworkURI || null;
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {ownedArts.map(({ art, ownedCount, artId }, index) => {
+            const inputs = transferInputs[artId.toString()] || {
+              toAddress: "",
+              amount: "",
+            };
 
-          const musicSrc = art.musicURI?.startsWith("ipfs://")
-            ? art.musicURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.musicURI || null;
+            const isAddressValid = isAddress(inputs.toAddress);
+            const amount = parseInt(inputs.amount, 10);
+            const isAmountValid =
+              Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
 
-          return (
-            <div
-              key={i}
-              className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
-            >
-              <div>
+            const calls = allCalls[index] ? [allCalls[index]!] : [];
+
+            const previewSrc = getIpfsUrl(art.previewImage);
+            const mediaSrc = getIpfsUrl(art.mediaUrl);
+            const mediaType = getMediaType(mediaSrc);
+            const previewType = getMediaType(previewSrc);
+
+            return (
+              <div
+                key={artId.toString()}
+                className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
+              >
                 <h3 className="text-lg font-semibold">{art.title}</h3>
-                <p className="text-sm text-gray-400 mb-2">
+                <p className="text-sm text-gray-400">
                   Artist:{" "}
-                  <code
-                    className="cursor-pointer select-all"
-                    onClick={() => navigator.clipboard.writeText(art.artist)}
+                  <span
+                    className="cursor-pointer hover:text-blue-400"
+                    onClick={() =>
+                      navigator.clipboard.writeText(art.artistName)
+                    }
                   >
-                    &#128257;{" "}
-                    {art.artist.length > 12
-                      ? `${art.artist.slice(0, 5)}...${art.artist.slice(-5)}`
-                      : art.artist}
-                  </code>
+                    {art.artistName}
+                  </span>
                 </p>
 
-                {artworkSrc && (
-                  <>
-                    <img
-                      src={artworkSrc}
-                      alt={art.title}
-                      className="w-full max-h-48 object-cover rounded-md mb-2"
-                    />
-                    <button
-                      onClick={() =>
-                        downloadFile(
-                          artworkSrc,
-                          `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
+                {/* Preview Section */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-300">Preview</h4>
+                  <MediaRenderer
+                    src={getIpfsUrl(art.previewImage)}
+                    type="image"
+                    isPreview
+                  />
+                  <button
+                    onClick={() =>
+                      downloadFile(
+                        getIpfsUrl(art.previewImage),
+                        `${art.title.replace(/\s+/g, "_")}_preview.${getIpfsUrl(
+                          art.previewImage
                         )
-                      }
-                      disabled={isRefreshing}
-                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
-                    >
-                      Download Artwork
-                    </button>
-                  </>
-                )}
+                          .split(".")
+                          .pop()}`
+                      )
+                    }
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    disabled={!art.previewImage}
+                  >
+                    Download Preview
+                  </button>
+                </div>
 
-                {musicSrc && (
-                  <>
-                    <audio
-                      src={musicSrc}
-                      controls
-                      className="w-full rounded max-h-20 mb-2"
-                    />
-                    <button
-                      onClick={() =>
-                        downloadFile(
-                          musicSrc,
-                          `${art.title.replace(/\s+/g, "_")}_music.mp3`
+                {/* Main Media Section */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-center items-center  text-gray-300">
+                    Media
+                  </h4>
+                  {/* <MediaRenderer
+                    src={getIpfsUrl(art.mediaUrl)}
+                    type={getMediaType(getIpfsUrl(art.mediaUrl))}
+                  /> */}
+                  <button
+                    onClick={() =>
+                      downloadFile(
+                        getIpfsUrl(art.mediaUrl),
+                        `${art.title.replace(/\s+/g, "_")}_media.${getIpfsUrl(
+                          art.mediaUrl
                         )
-                      }
-                      disabled={isRefreshing}
-                      className="py-1 w-full bg-[#007FFF] text-white rounded-md hover:bg-[#0066cc] disabled:bg-[#A0C4FF] transition"
-                    >
-                      Download Music
-                    </button>
-                  </>
-                )}
+                          .split(".")
+                          .pop()}`
+                      )
+                    }
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    disabled={!art.mediaUrl}
+                  >
+                    Download Media
+                  </button>
+                </div>
 
-                <p className="text-sm text-white mt-1">
-                  Price: {formatEther(art.price)} ETH
-                </p>
-                <p className="font-medium text-green-500">
-                  You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
-                </p>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <p>Price: {formatEther(art.priceInWei)} ETH</p>
+                  <p>
+                    Minted: {art.totalMinted.toString()}/
+                    {art.maxSupply.toString()}
+                  </p>
+                  <p className="text-green-500 col-span-2">
+                    You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
+                  </p>
+                </div>
+
+                <div className="space-y-2 mt-4">
+                  <input
+                    type="text"
+                    placeholder="Recipient address (0x...)"
+                    value={inputs.toAddress}
+                    onChange={(e) =>
+                      handleInputChange(artId, "toAddress", e.target.value)
+                    }
+                    className={`w-full px-3 py-2 rounded text-white ${
+                      inputs.toAddress
+                        ? isAddressValid
+                          ? "border-green-500"
+                          : "border-red-500"
+                        : "border-gray-300"
+                    } border`}
+                  />
+
+                  <div></div>
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    min="1"
+                    max={ownedCount}
+                    value={inputs.amount}
+                    onChange={(e) =>
+                      handleInputChange(artId, "amount", e.target.value)
+                    }
+                    className={`w-full px-3 py-2 rounded text-white ${
+                      inputs.amount
+                        ? isAmountValid
+                          ? "border-green-500"
+                          : "border-red-500"
+                        : "border-gray-300"
+                    } border`}
+                  />
+
+                  <Transaction
+                    chainId={BASE_SEPOLIA_CHAIN_ID}
+                    calls={calls}
+                    onStatus={handleOnStatus}
+                  >
+                    <TransactionButton
+                      text="Transfer NFT"
+                      disabled={calls.length === 0}
+                      className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    />
+                    <TransactionSponsor />
+                    <TransactionStatus className="text-xs mt-2 text-gray-300">
+                      <TransactionStatusLabel />
+                      <TransactionStatusAction />
+                    </TransactionStatus>
+                  </Transaction>
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );
-}
-
-function isValidAddress(address: string) {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
 }

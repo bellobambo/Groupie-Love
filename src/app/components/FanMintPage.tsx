@@ -13,13 +13,14 @@ import {
 } from "@coinbase/onchainkit/transaction";
 
 interface Art {
-  artist: string;
   title: string;
-  artworkURI: string;
-  musicURI: string;
-  price: bigint;
-  availableMints: bigint;
-  mintedCount: bigint;
+  artistName: string;
+  artistWallet: string;
+  mediaUrl: string;
+  previewImage: string;
+  priceInWei: bigint;
+  totalMinted: bigint;
+  maxSupply: bigint;
 }
 
 export default function FanMintPage() {
@@ -46,7 +47,7 @@ export default function FanMintPage() {
       {
         address: groupieContractAddress,
         abi: groupieContractABI,
-        functionName: "nextArtId",
+        functionName: "getArtCount",
       },
     ],
   });
@@ -72,13 +73,14 @@ export default function FanMintPage() {
           if (!result) return undefined;
 
           return {
-            artist: result[0],
-            title: result[1],
-            artworkURI: result[2],
-            musicURI: result[3],
-            price: BigInt(result[4]),
-            availableMints: BigInt(result[5]),
-            mintedCount: BigInt(result[6]),
+            title: result[0],
+            artistName: result[1],
+            artistWallet: result[2],
+            mediaUrl: result[3],
+            previewImage: result[4],
+            priceInWei: BigInt(result[5]),
+            totalMinted: BigInt(result[6]),
+            maxSupply: BigInt(result[7]),
           } satisfies Art;
         })
         .filter(Boolean) as Art[];
@@ -95,9 +97,9 @@ export default function FanMintPage() {
 
       <div className="space-y-6">
         {arts.map((art, index) => {
-          const imageUrl = art.artworkURI.startsWith("ipfs://")
-            ? art.artworkURI.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.artworkURI;
+          const imageUrl = art.previewImage.startsWith("ipfs://")
+            ? art.previewImage.replace("ipfs://", "https://ipfs.io/ipfs/")
+            : art.previewImage;
 
           return (
             <div
@@ -107,42 +109,18 @@ export default function FanMintPage() {
               <h3 className="text-xl font-semibold text-white">{art.title}</h3>
 
               <p className="text-sm text-gray-400">
-                Artist:{" "}
-                <span className="relative inline-flex items-center gap-1">
-                  {copiedAddress === art.artist && (
-                    <span className="absolute  left-50 bg-green-500 text-white text-xs px-2 py-1 rounded whitespace-nowrap">
-                      Copied!
-                    </span>
-                  )}
-
+                Artist: {art.artistName} -
+                <span className="relative inline-flex items-center gap-1 ml-1">
                   <span
-                    onClick={() => handleCopyAddress(art.artist)}
+                    onClick={() => handleCopyAddress(art.artistWallet)}
                     className="cursor-pointer hover:underline"
-                    title={art.artist}
+                    title={art.artistWallet}
                   >
-                    {shortenAddress(art.artist)}
+                    {shortenAddress(art.artistWallet)}
                   </span>
-
-                  <button
-                    onClick={() => handleCopyAddress(art.artist)}
-                    className="text-gray-400 hover:text-gray-600"
-                    aria-label="Copy address"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="h-4 w-4"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                      stroke="currentColor"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                      />
-                    </svg>
-                  </button>
+                  {copiedAddress === art.artistWallet && (
+                    <span className="text-xs text-green-400">Copied!</span>
+                  )}
                 </span>
               </p>
 
@@ -156,10 +134,13 @@ export default function FanMintPage() {
 
               <div className="flex flex-col sm:flex-row justify-between text-sm text-gray-400 gap-2">
                 <p>
-                  Mints: {art.mintedCount.toString()} /{" "}
-                  {art.availableMints.toString()}
+                  Price: {parseFloat(formatEther(art.priceInWei)).toFixed(4)}{" "}
+                  ETH
                 </p>
-                <p>Price: {formatEther(art.price)} ETH</p>
+                <p>
+                  Mints: {art.totalMinted.toString()} /{" "}
+                  {art.maxSupply.toString()}
+                </p>
               </div>
 
               {address && (
@@ -170,8 +151,8 @@ export default function FanMintPage() {
                       address: groupieContractAddress,
                       abi: groupieContractABI,
                       functionName: "mintArt",
-                      args: [BigInt(index)],
-                      value: art.price,
+                      args: [BigInt(index), BigInt(1)],
+                      value: art.priceInWei,
                     },
                   ]}
                 >
