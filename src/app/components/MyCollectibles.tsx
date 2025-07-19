@@ -1,9 +1,10 @@
 "use client";
 
 import { useAccount, useReadContracts } from "wagmi";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
 import { formatEther, isAddress } from "viem";
+import { Music, Image as ImageIcon, Video, FileWarning } from "lucide-react";
 
 import {
   Transaction,
@@ -27,6 +28,89 @@ interface Art {
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
+// MediaRenderer component moved outside the main component
+const MediaRenderer = ({
+  src,
+  type,
+  isPreview = false,
+}: {
+  src: string;
+  type: string;
+  isPreview?: boolean;
+}) => {
+  const [hasError, setHasError] = useState(false);
+
+  if (!src || hasError)
+    return <MediaFallback type={isPreview ? "preview" : type} />;
+
+  const handleError = () => setHasError(true);
+
+  try {
+    switch (type) {
+      case "image":
+        return (
+          <img
+            src={src}
+            alt={isPreview ? "NFT Preview" : "NFT Media"}
+            className={`w-full ${
+              isPreview ? "max-h-48" : "max-h-64"
+            } object-contain rounded-md`}
+            onError={handleError}
+          />
+        );
+      case "audio":
+        return (
+          <audio
+            controls
+            src={src}
+            className="w-full rounded"
+            onError={handleError}
+          />
+        );
+      case "video":
+        return (
+          <video
+            controls
+            src={src}
+            className={`w-full ${
+              isPreview ? "max-h-48" : "max-h-64"
+            } rounded-md`}
+            onError={handleError}
+          />
+        );
+      default:
+        return <MediaFallback type={isPreview ? "preview" : "media"} />;
+    }
+  } catch (e) {
+    console.error("Error rendering media:", e);
+    return <MediaFallback type={isPreview ? "preview" : "media"} />;
+  }
+};
+
+// Fallback component for failed media
+const MediaFallback = ({ type = "media" }: { type?: string }) => {
+  let message = "Media not available";
+  let Icon = FileWarning;
+
+  if (type === "audio") {
+    message = "Audio not available";
+    Icon = Music;
+  } else if (type === "video") {
+    message = "Video not available";
+    Icon = Video;
+  } else if (type === "image" || type === "preview") {
+    message = "Image not available";
+    Icon = ImageIcon;
+  }
+
+  return (
+    <div className="w-full h-48 bg-gray-800 rounded-md flex flex-col items-center justify-center gap-2">
+      <Icon className="w-8 h-8 text-gray-400" />
+      <span className="text-sm text-gray-400">{message}</span>
+    </div>
+  );
+};
+
 export default function MyCollectibles() {
   const { address } = useAccount();
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -37,6 +121,7 @@ export default function MyCollectibles() {
     [artId: string]: { toAddress: string; amount: string };
   }>({});
 
+  // Fetch art count
   const artCountResult = useReadContracts({
     contracts: [
       {
@@ -47,83 +132,163 @@ export default function MyCollectibles() {
     ],
   });
 
-  const artCount = artCountResult.data?.[0]?.result as bigint | undefined;
+  const artCount = useMemo(() => {
+    const count = artCountResult.data?.[0]?.result;
+    return count !== undefined ? BigInt(count) : 0n;
+  }, [artCountResult.data]);
 
+  // Fetch balances
   const balanceResults = useReadContracts({
-    contracts: artCount
-      ? Array.from({ length: Number(artCount) }, (_, i) => ({
-          address: groupieContractAddress,
-          abi: groupieContractABI,
-          functionName: "balanceOf",
-          args: [address, i],
-        }))
-      : [],
-  });
-
-  const artDetailsResults = useReadContracts({
-    contracts: balanceResults.data
-      ? balanceResults.data
-          .map((res, i) => ({
-            hasBalance: (res.result as bigint) > 0n,
-            artId: i,
-          }))
-          .filter(({ hasBalance }) => hasBalance)
-          .map(({ artId }) => ({
+    contracts:
+      artCount > 0n
+        ? Array.from({ length: Number(artCount) }, (_, i) => ({
             address: groupieContractAddress,
             abi: groupieContractABI,
-            functionName: "getArt",
-            args: [artId],
+            functionName: "balanceOf",
+            args: [address, i],
           }))
-      : [],
+        : [],
   });
 
-  const refreshData = async () => {
+  // Prepare contracts for art details
+  const artDetailsContracts = useMemo(() => {
+    if (!balanceResults.data || !artCount) return [];
+
+    return balanceResults.data
+      .map((res, i) => ({
+        hasBalance: res.result ? BigInt(res.result) > 0n : false,
+        artId: i,
+      }))
+      .filter(({ hasBalance }) => hasBalance)
+      .map(({ artId }) => ({
+        address: groupieContractAddress,
+        abi: groupieContractABI,
+        functionName: "getArt",
+        args: [artId],
+      }));
+  }, [balanceResults.data, artCount]);
+
+  // Fetch art details
+  const artDetailsResults = useReadContracts({
+    contracts: artDetailsContracts,
+  });
+
+  const refreshData = useCallback(async () => {
     setIsRefreshing(true);
     try {
-      await Promise.all([
-        artCountResult.refetch(),
-        balanceResults.refetch(),
-        artDetailsResults.refetch(),
-      ]);
+      await Promise.all([artCountResult.refetch(), balanceResults.refetch()]);
     } finally {
       setIsRefreshing(false);
     }
+  }, [artCountResult, balanceResults]);
+
+  // Process owned arts
+  useEffect(() => {
+    if (!artDetailsResults.data || !balanceResults.data || artCount === 0n) {
+      setOwnedArts([]);
+      return;
+    }
+
+    const processedArts = artDetailsResults.data
+      .map((res, index) => {
+        if (!res.result) return null;
+
+        const artId = artDetailsContracts[index]?.args?.[0];
+        if (artId === undefined) return null;
+
+        const balanceRes = balanceResults.data?.[Number(artId)];
+        const balance = balanceRes?.result ? BigInt(balanceRes.result) : 0n;
+
+        if (balance === 0n) return null;
+
+        const artData = res.result as any;
+        console.log("Fetched NFT data:", artData);
+
+        try {
+          return {
+            art: {
+              title: artData.title || artData[0] || "Untitled",
+              artistName: artData.artistName || artData[1] || "Unknown Artist",
+              artistWallet: artData.artistWallet || artData[2] || address || "",
+              mediaUrl: artData.mediaUrl || artData[3] || "",
+              previewImage: artData.previewImage || artData[4] || "",
+              priceInWei:
+                artData.price || artData.priceInWei || artData[5]
+                  ? BigInt(artData.price || artData.priceInWei || artData[5])
+                  : 0n,
+              totalMinted:
+                artData.totalMinted || artData[6]
+                  ? BigInt(artData.totalMinted || artData[6])
+                  : 0n,
+              maxSupply:
+                artData.maxSupply || artData[7]
+                  ? BigInt(artData.maxSupply || artData[7])
+                  : 0n,
+            },
+            artId: BigInt(artId),
+            ownedCount: Number(balance),
+          };
+        } catch (error) {
+          console.error("Error processing art data:", error, artData);
+          return null;
+        }
+      })
+      .filter(Boolean) as { art: Art; artId: bigint; ownedCount: number }[];
+
+    setOwnedArts(processedArts);
+  }, [
+    artDetailsResults.data,
+    balanceResults.data,
+    artCount,
+    artDetailsContracts,
+    address,
+  ]);
+
+  // Improved IPFS URL handler with multiple gateways
+  const getIpfsUrl = (ipfsUri: string) => {
+    if (!ipfsUri) return "";
+    if (ipfsUri.startsWith("ipfs://")) {
+      const cid = ipfsUri.replace("ipfs://", "");
+      // Try multiple gateways
+      const gateways = [
+        `https://ipfs.io/ipfs/${cid}`,
+        `https://cloudflare-ipfs.com/ipfs/${cid}`,
+        `https://dweb.link/ipfs/${cid}`,
+        `https://gateway.pinata.cloud/ipfs/${cid}`,
+      ];
+      return gateways[0]; // Start with first gateway
+    }
+    return ipfsUri;
   };
 
-  useEffect(() => {
-    if (artDetailsResults.data && balanceResults.data && artCount) {
-      const artsWithBalance = balanceResults.data
-        .map((res, i) => ({
-          balance: res.result as bigint,
-          artId: BigInt(i),
-        }))
-        .filter(({ balance }) => balance > 0n);
-
-      const owned = artDetailsResults.data.map((res, i) => {
-        const artData = res.result as any;
-        return {
-          art: {
-            title: artData[0],
-            artistName: artData[1],
-            artistWallet: artData[2],
-            mediaUrl: artData[3],
-            previewImage: artData[4],
-            priceInWei: BigInt(artData[5]),
-            totalMinted: BigInt(artData[6]),
-            maxSupply: BigInt(artData[7]),
-          },
-          artId: artsWithBalance[i].artId,
-          ownedCount: Number(artsWithBalance[i].balance),
-        };
-      });
-
-      setOwnedArts(owned);
+  // Enhanced media type detection
+  const getMediaType = (url: string) => {
+    if (!url) return "unknown";
+    try {
+      const pathname = new URL(url).pathname;
+      const extension = pathname.split(".").pop()?.toLowerCase() || "";
+      if (["jpg", "jpeg", "png", "gif", "webp"].includes(extension)) {
+        return "image";
+      } else if (["mp3", "wav", "ogg"].includes(extension)) {
+        return "audio";
+      } else if (["mp4", "webm", "mov"].includes(extension)) {
+        return "video";
+      }
+    } catch (e) {
+      console.error("Error parsing media URL:", url, e);
     }
-  }, [artDetailsResults.data, balanceResults.data, artCount]);
+    return "unknown";
+  };
 
-  const handleOnStatus = useCallback((status: any) => {
-    console.log("Transaction status:", status);
-  }, []);
+  const handleOnStatus = useCallback(
+    (status: any) => {
+      console.log("Transaction status:", status);
+      if (status === "success") {
+        refreshData();
+      }
+    },
+    [refreshData]
+  );
 
   const handleInputChange = (
     artId: bigint,
@@ -140,18 +305,51 @@ export default function MyCollectibles() {
   };
 
   function downloadFile(url: string, filename: string) {
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    if (!url) return;
+
+    try {
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error("Error downloading file:", error);
+    }
   }
+
+  // Prepare all calls outside the render loop
+  const allCalls = useMemo(() => {
+    return ownedArts.map(({ artId }) => {
+      const inputs = transferInputs[artId.toString()] || {
+        toAddress: "",
+        amount: "",
+      };
+
+      const isAddressValid = isAddress(inputs.toAddress);
+      const amount = BigInt(inputs.amount || "0");
+
+      const ownedCount =
+        ownedArts.find((a) => a.artId === artId)?.ownedCount || 0;
+      const isAmountValid =
+        Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
+
+      return isAddressValid && isAmountValid
+        ? {
+            address: groupieContractAddress,
+            abi: groupieContractABI,
+            functionName: "transferArt",
+            args: [inputs.toAddress, artId, amount],
+          }
+        : null;
+    });
+  }, [ownedArts, transferInputs]);
 
   return (
     <div className="py-10 space-y-8 w-full px-4 sm:px-6 max-w-screen-lg mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF] ">
+        <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF]">
           My Collectibles
         </h2>
         <button
@@ -198,150 +396,164 @@ export default function MyCollectibles() {
           <p className="text-gray-500">Mint an NFT to start your collection</p>
         </div>
       ) : (
-        ownedArts.map(({ art, ownedCount, artId }) => {
-          const inputs = transferInputs[artId.toString()] || {
-            toAddress: "",
-            amount: "",
-          };
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {ownedArts.map(({ art, ownedCount, artId }, index) => {
+            const inputs = transferInputs[artId.toString()] || {
+              toAddress: "",
+              amount: "",
+            };
 
-          const isAddressValid = isAddress(inputs.toAddress);
-          const amount = parseInt(inputs.amount, 10);
-          const isAmountValid =
-            Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
+            const isAddressValid = isAddress(inputs.toAddress);
+            const amount = parseInt(inputs.amount, 10);
+            const isAmountValid =
+              Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
 
-          const calls =
-            isAddressValid && isAmountValid
-              ? [
-                  {
-                    address: groupieContractAddress,
-                    abi: groupieContractABI,
-                    functionName: "transferArt",
-                    args: [inputs.toAddress, artId, amount],
-                  },
-                ]
-              : [];
+            const calls = allCalls[index] ? [allCalls[index]!] : [];
 
-          const previewSrc = art.previewImage?.startsWith("ipfs://")
-            ? art.previewImage.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.previewImage;
+            const previewSrc = getIpfsUrl(art.previewImage);
+            const mediaSrc = getIpfsUrl(art.mediaUrl);
+            const mediaType = getMediaType(mediaSrc);
+            const previewType = getMediaType(previewSrc);
 
-          const mediaSrc = art.mediaUrl?.startsWith("ipfs://")
-            ? art.mediaUrl.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.mediaUrl;
+            return (
+              <div
+                key={artId.toString()}
+                className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
+              >
+                <h3 className="text-lg font-semibold">{art.title}</h3>
+                <p className="text-sm text-gray-400">
+                  Artist:{" "}
+                  <span
+                    className="cursor-pointer hover:text-blue-400"
+                    onClick={() =>
+                      navigator.clipboard.writeText(art.artistName)
+                    }
+                  >
+                    {art.artistName}
+                  </span>
+                </p>
 
-          return (
-            <div
-              key={artId.toString()}
-              className="p-4 sm:p-6 bg-black rounded-xl shadow-lg border border-gray-300 space-y-4 text-white"
-            >
-              <h3 className="text-lg font-semibold">{art.title}</h3>
-              <p className="text-sm text-gray-400">
-                Artist:{" "}
-                <span
-                  className="cursor-pointer"
-                  onClick={() => navigator.clipboard.writeText(art.artistName)}
-                >
-                  {art.artistName}
-                </span>
-              </p>
-
-              {previewSrc && (
-                <div>
-                  <img
-                    src={previewSrc}
-                    alt={art.title}
-                    className="w-full max-h-48 object-cover rounded-md mb-2"
+                {/* Preview Section */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-gray-300">Preview</h4>
+                  <MediaRenderer
+                    src={getIpfsUrl(art.previewImage)}
+                    type="image"
+                    isPreview
                   />
                   <button
                     onClick={() =>
                       downloadFile(
-                        previewSrc,
-                        `${art.title.replace(/\s+/g, "_")}_artwork.jpg`
+                        getIpfsUrl(art.previewImage),
+                        `${art.title.replace(/\s+/g, "_")}_preview.${getIpfsUrl(
+                          art.previewImage
+                        )
+                          .split(".")
+                          .pop()}`
                       )
                     }
-                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc]"
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    disabled={!art.previewImage}
                   >
-                    Download Artwork
+                    Download Preview
                   </button>
                 </div>
-              )}
 
-              {mediaSrc && (
-                <div>
-                  <audio
-                    controls
-                    src={mediaSrc}
-                    className="w-full rounded max-h-20 mb-2"
-                  />
+                {/* Main Media Section */}
+                <div className="space-y-2">
+                  <h4 className="text-sm font-medium text-center items-center  text-gray-300">
+                    Media
+                  </h4>
+                  {/* <MediaRenderer
+                    src={getIpfsUrl(art.mediaUrl)}
+                    type={getMediaType(getIpfsUrl(art.mediaUrl))}
+                  /> */}
                   <button
                     onClick={() =>
                       downloadFile(
-                        mediaSrc,
-                        `${art.title.replace(/\s+/g, "_")}_media.mp3`
+                        getIpfsUrl(art.mediaUrl),
+                        `${art.title.replace(/\s+/g, "_")}_media.${getIpfsUrl(
+                          art.mediaUrl
+                        )
+                          .split(".")
+                          .pop()}`
                       )
                     }
-                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc]"
+                    className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    disabled={!art.mediaUrl}
                   >
                     Download Media
                   </button>
                 </div>
-              )}
 
-              <p className="text-sm">
-                Price: {formatEther(art.priceInWei)} ETH
-              </p>
-              <p className="text-sm">
-                Minted: {art.totalMinted.toString()} /{" "}
-                {art.maxSupply.toString()}
-              </p>
-              <p className="text-green-500">
-                You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
-              </p>
+                <div className="grid grid-cols-1 gap-2 text-sm">
+                  <p>Price: {formatEther(art.priceInWei)} ETH</p>
+                  <p>
+                    Minted: {art.totalMinted.toString()}/
+                    {art.maxSupply.toString()}
+                  </p>
+                  <p className="text-green-500 col-span-2">
+                    You own {ownedCount} {ownedCount > 1 ? "copies" : "copy"}
+                  </p>
+                </div>
 
-              <div className="space-y-2 mt-4 text-black">
-                <input
-                  type="text"
-                  placeholder="Recipient address (0x...)"
-                  value={inputs.toAddress}
-                  onChange={(e) =>
-                    handleInputChange(artId, "toAddress", e.target.value)
-                  }
-                  className={`w-full px-3 py-2 rounded ${
-                    isAddressValid ? "border-green-500" : "border-red-500"
-                  } border`}
-                />
-                <input
-                  type="number"
-                  placeholder="Amount"
-                  value={inputs.amount}
-                  onChange={(e) =>
-                    handleInputChange(artId, "amount", e.target.value)
-                  }
-                  className={`w-full px-3 py-2 rounded ${
-                    isAmountValid ? "border-green-500" : "border-red-500"
-                  } border`}
-                />
-
-                <Transaction
-                  chainId={BASE_SEPOLIA_CHAIN_ID}
-                  calls={calls}
-                  onStatus={handleOnStatus}
-                >
-                  <TransactionButton
-                    text="🚀 Transfer NFT"
-                    disabled={calls.length === 0}
-                    className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc]"
+                <div className="space-y-2 mt-4">
+                  <input
+                    type="text"
+                    placeholder="Recipient address (0x...)"
+                    value={inputs.toAddress}
+                    onChange={(e) =>
+                      handleInputChange(artId, "toAddress", e.target.value)
+                    }
+                    className={`w-full px-3 py-2 rounded text-white ${
+                      inputs.toAddress
+                        ? isAddressValid
+                          ? "border-green-500"
+                          : "border-red-500"
+                        : "border-gray-300"
+                    } border`}
                   />
-                  <TransactionSponsor />
-                  <TransactionStatus className="text-xs mt-2 text-gray-300">
-                    <TransactionStatusLabel />
-                    <TransactionStatusAction />
-                  </TransactionStatus>
-                </Transaction>
+
+                  <div></div>
+                  <input
+                    type="number"
+                    placeholder="Amount"
+                    min="1"
+                    max={ownedCount}
+                    value={inputs.amount}
+                    onChange={(e) =>
+                      handleInputChange(artId, "amount", e.target.value)
+                    }
+                    className={`w-full px-3 py-2 rounded text-white ${
+                      inputs.amount
+                        ? isAmountValid
+                          ? "border-green-500"
+                          : "border-red-500"
+                        : "border-gray-300"
+                    } border`}
+                  />
+
+                  <Transaction
+                    chainId={BASE_SEPOLIA_CHAIN_ID}
+                    calls={calls}
+                    onStatus={handleOnStatus}
+                  >
+                    <TransactionButton
+                      text="Transfer NFT"
+                      disabled={calls.length === 0}
+                      className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc] transition-colors disabled:opacity-50"
+                    />
+                    <TransactionSponsor />
+                    <TransactionStatus className="text-xs mt-2 text-gray-300">
+                      <TransactionStatusLabel />
+                      <TransactionStatusAction />
+                    </TransactionStatus>
+                  </Transaction>
+                </div>
               </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </div>
   );

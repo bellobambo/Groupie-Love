@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import {
   Transaction,
   TransactionButton,
@@ -30,22 +30,16 @@ import { groupieContractABI, groupieContractAddress } from "./GroupieABI";
 import { parseEther } from "viem";
 import FanMintPage from "./components/FanMintPage";
 import MyCollectibles from "./components/MyCollectibles";
-import { LiaMicrophoneSolid } from "react-icons/lia";
-import { PiGuitarThin } from "react-icons/pi";
-import { GiGuitarBassHead } from "react-icons/gi";
-import { HiOutlinePaintBrush } from "react-icons/hi2";
-import { CiHeart } from "react-icons/ci";
-import { BsHourglass } from "react-icons/bs";
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
 export default function UploadArtForm() {
   const { address } = useAccount();
-
-  const [title, setTitle] = useState(""); // 🔧 NEW state
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [title, setTitle] = useState("");
   const [artworkURI, setArtworkURI] = useState("");
   const [artistName, setArtistName] = useState("");
-  const [musicURI, setMusicURI] = useState("");
+  const [fileURI, setFileURI] = useState("");
   const [priceEth, setPriceEth] = useState("");
   const [availableMints, setAvailableMints] = useState("");
   const [ipfsUploading, setIpfsUploading] = useState(false);
@@ -55,6 +49,7 @@ export default function UploadArtForm() {
       artworkURI &&
       priceEth &&
       !isNaN(parseFloat(priceEth)) &&
+      parseFloat(priceEth) > 0 &&
       availableMints
   );
 
@@ -78,24 +73,34 @@ export default function UploadArtForm() {
     return `ipfs://${data.IpfsHash}`;
   };
 
-  const calls = [
-    {
-      address: groupieContractAddress,
-      abi: groupieContractABI,
-      functionName: "uploadArt",
-      args: [
-        title,
-        artistName,
-        musicURI || "",
-        artworkURI,
-        parseEther(priceEth),
-        BigInt(availableMints),
-      ],
-    },
-  ];
+  const calls = useMemo(() => {
+    try {
+      return [
+        {
+          address: groupieContractAddress,
+          abi: groupieContractABI,
+          functionName: "uploadArt",
+          args: [
+            title,
+            artistName,
+            fileURI || "",
+            artworkURI,
+            parseEther(priceEth || "0"), // Convert to wei
+            BigInt(availableMints || "0"),
+          ],
+        },
+      ];
+    } catch (error) {
+      console.error("Error preparing transaction:", error);
+      return [];
+    }
+  }, [title, artistName, fileURI, artworkURI, priceEth, availableMints]);
 
   const handleOnStatus = useCallback((status: any) => {
     console.log("Transaction status:", status);
+    if (status === "success") {
+      setRefreshKey((prev) => prev + 1);
+    }
   }, []);
 
   return (
@@ -195,19 +200,18 @@ export default function UploadArtForm() {
               />
             </div>
 
-            {/* Music File */}
+            {/* Any File Upload */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#007FFF]">
-                Audio File(optional)
+                Attach a File (optional)
               </label>
               <input
                 type="file"
-                accept="audio/*"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (file) {
                     const hash = await handleUploadToIPFS(file);
-                    setMusicURI(hash);
+                    setFileURI(hash);
                   }
                 }}
                 disabled={ipfsUploading}
@@ -224,8 +228,14 @@ export default function UploadArtForm() {
                 <input
                   type="number"
                   step="0.0001"
+                  min="0.0001"
                   value={priceEth}
-                  onChange={(e) => setPriceEth(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      setPriceEth(value);
+                    }
+                  }}
                   className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md"
                 />
               </div>
@@ -235,6 +245,7 @@ export default function UploadArtForm() {
                 </label>
                 <input
                   type="number"
+                  min="1"
                   value={availableMints}
                   onChange={(e) => setAvailableMints(e.target.value)}
                   className="w-full px-3 py-2 bg-white/80 border border-[#007FFF]/40 rounded-md"
@@ -250,7 +261,7 @@ export default function UploadArtForm() {
             >
               <TransactionButton
                 disabled={!isFormValid || ipfsUploading}
-                text="🚀 Upload Art"
+                text="Upload Art"
                 className="w-full bg-[#007FFF] text-white py-2 rounded-md font-medium hover:bg-[#0066cc] transition-all"
               />
               <TransactionSponsor />
@@ -263,7 +274,8 @@ export default function UploadArtForm() {
         </>
       )}
 
-      <FanMintPage />
+      <FanMintPage key={refreshKey} />
+
       <MyCollectibles />
     </div>
   );

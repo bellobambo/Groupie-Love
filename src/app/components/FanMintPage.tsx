@@ -109,9 +109,8 @@ export default function FanMintPage() {
               <h3 className="text-xl font-semibold text-white">{art.title}</h3>
 
               <p className="text-sm text-gray-400">
-                Artist:{" "}
-                <span className="relative inline-flex items-center gap-1">
-                  ...
+                Artist: {art.artistName} -
+                <span className="relative inline-flex items-center gap-1 ml-1">
                   <span
                     onClick={() => handleCopyAddress(art.artistWallet)}
                     className="cursor-pointer hover:underline"
@@ -119,6 +118,9 @@ export default function FanMintPage() {
                   >
                     {shortenAddress(art.artistWallet)}
                   </span>
+                  {copiedAddress === art.artistWallet && (
+                    <span className="text-xs text-green-400">Copied!</span>
+                  )}
                 </span>
               </p>
 
@@ -131,7 +133,10 @@ export default function FanMintPage() {
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between text-sm text-gray-400 gap-2">
-                <p>Price: {formatEther(art.priceInWei)} ETH</p>
+                <p>
+                  Price: {parseFloat(formatEther(art.priceInWei)).toFixed(4)}{" "}
+                  ETH
+                </p>
                 <p>
                   Mints: {art.totalMinted.toString()} /{" "}
                   {art.maxSupply.toString()}

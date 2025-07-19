@@ -1,5 +1,5 @@
 export const groupieContractAddress =
-  "0x34a608794e6B2E61e5c68E264eF198D416E26137" as `0x${string}`;
+  "0xa9265e612543985ed1691dEED9A1117FF518aC80" as `0x${string}`;
 
 export const groupieContractABI = [
   {
@@ -262,7 +262,7 @@ export const groupieContractABI = [
       },
       {
         internalType: "uint256",
-        name: "priceInWei",
+        name: "price",
         type: "uint256",
       },
       {
@@ -366,7 +366,7 @@ export const groupieContractABI = [
           },
           {
             internalType: "uint256",
-            name: "priceInWei",
+            name: "price",
             type: "uint256",
           },
           {
@@ -626,7 +626,7 @@ export const groupieContractABI = [
       },
       {
         internalType: "uint256",
-        name: "_priceInEther",
+        name: "_price",
         type: "uint256",
       },
       {
