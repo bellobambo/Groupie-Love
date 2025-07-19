@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAccount, useReadContracts } from "wagmi";
 import { formatEther } from "viem";
 import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
@@ -89,6 +89,10 @@ export default function FanMintPage() {
     }
   }, [artsData]);
 
+  const handleOnStatus = useCallback((status: any) => {
+    console.log("Minted status:", status);
+  }, []);
+
   return (
     <div className="py-10 space-y-8 px-4 sm:px-6 w-full max-w-screen-lg mx-auto">
       <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF]">
@@ -146,6 +150,7 @@ export default function FanMintPage() {
               {address && (
                 <Transaction
                   chainId={chain?.id}
+                  onStatus={handleOnStatus}
                   calls={[
                     {
                       address: groupieContractAddress,

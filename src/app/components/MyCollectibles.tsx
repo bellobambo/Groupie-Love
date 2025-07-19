@@ -332,8 +332,7 @@ export default function MyCollectibles() {
 
       const ownedCount =
         ownedArts.find((a) => a.artId === artId)?.ownedCount || 0;
-      const isAmountValid =
-        Number.isInteger(amount) && amount > 0 && amount <= ownedCount;
+      const isAmountValid = amount > 0n && amount <= BigInt(ownedCount);
 
       return isAddressValid && isAmountValid
         ? {
