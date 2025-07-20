@@ -20,7 +20,7 @@ interface Art {
   artistName: string;
   artistWallet: string;
   mediaUrl: string;
-  previewImage: string;
+  previewUrl: string;
   priceInWei: bigint;
   totalMinted: bigint;
   maxSupply: bigint;
@@ -211,7 +211,7 @@ export default function MyCollectibles() {
               artistName: artData.artistName || artData[1] || "Unknown Artist",
               artistWallet: artData.artistWallet || artData[2] || address || "",
               mediaUrl: artData.mediaUrl || artData[3] || "",
-              previewImage: artData.previewImage || artData[4] || "",
+              previewUrl: artData.previewUrl || artData[4] || "",
               priceInWei:
                 artData.price || artData.priceInWei || artData[5]
                   ? BigInt(artData.price || artData.priceInWei || artData[5])
@@ -409,7 +409,7 @@ export default function MyCollectibles() {
 
             const calls = allCalls[index] ? [allCalls[index]!] : [];
 
-            const previewSrc = getIpfsUrl(art.previewImage);
+            const previewSrc = getIpfsUrl(art.previewUrl);
             const mediaSrc = getIpfsUrl(art.mediaUrl);
             const mediaType = getMediaType(mediaSrc);
             const previewType = getMediaType(previewSrc);
@@ -436,23 +436,23 @@ export default function MyCollectibles() {
                 <div className="space-y-2">
                   <h4 className="text-sm font-medium text-gray-300">Preview</h4>
                   <MediaRenderer
-                    src={getIpfsUrl(art.previewImage)}
+                    src={getIpfsUrl(art.previewUrl)}
                     type="image"
                     isPreview
                   />
                   <button
                     onClick={() =>
                       downloadFile(
-                        getIpfsUrl(art.previewImage),
+                        getIpfsUrl(art.previewUrl),
                         `${art.title.replace(/\s+/g, "_")}_preview.${getIpfsUrl(
-                          art.previewImage
+                          art.previewUrl
                         )
                           .split(".")
                           .pop()}`
                       )
                     }
                     className="w-full py-1 bg-[#007FFF] rounded hover:bg-[#0066cc] transition-colors disabled:opacity-50"
-                    disabled={!art.previewImage}
+                    disabled={!art.previewUrl}
                   >
                     Download Preview
                   </button>

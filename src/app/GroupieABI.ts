@@ -1,5 +1,5 @@
 export const groupieContractAddress =
-  "0xa9265e612543985ed1691dEED9A1117FF518aC80" as `0x${string}`;
+  "0xA8e2D0949d6A3457CE4bf128aC754Fc9fcc0970E" as `0x${string}`;
 
 export const groupieContractABI = [
   {
@@ -226,6 +226,19 @@ export const groupieContractABI = [
     type: "event",
   },
   {
+    inputs: [],
+    name: "MAX_URI_LENGTH",
+    outputs: [
+      {
+        internalType: "uint256",
+        name: "",
+        type: "uint256",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
     inputs: [
       {
         internalType: "uint256",
@@ -257,7 +270,7 @@ export const groupieContractABI = [
       },
       {
         internalType: "string",
-        name: "previewImage",
+        name: "previewUrl",
         type: "string",
       },
       {
@@ -361,7 +374,7 @@ export const groupieContractABI = [
           },
           {
             internalType: "string",
-            name: "previewImage",
+            name: "previewUrl",
             type: "string",
           },
           {
@@ -451,6 +464,25 @@ export const groupieContractABI = [
         internalType: "address",
         name: "",
         type: "address",
+      },
+    ],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_artId",
+        type: "uint256",
+      },
+    ],
+    name: "previewUrl",
+    outputs: [
+      {
+        internalType: "string",
+        name: "",
+        type: "string",
       },
     ],
     stateMutability: "view",
@@ -621,7 +653,7 @@ export const groupieContractABI = [
       },
       {
         internalType: "string",
-        name: "_previewImage",
+        name: "_previewUrl",
         type: "string",
       },
       {
@@ -644,7 +676,7 @@ export const groupieContractABI = [
     inputs: [
       {
         internalType: "uint256",
-        name: "",
+        name: "_artId",
         type: "uint256",
       },
     ],
@@ -657,6 +689,13 @@ export const groupieContractABI = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [],
+    name: "withdraw",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
 ] as const;

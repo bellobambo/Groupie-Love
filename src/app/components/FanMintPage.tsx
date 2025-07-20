@@ -17,17 +17,24 @@ interface Art {
   artistName: string;
   artistWallet: string;
   mediaUrl: string;
-  previewImage: string;
+  previewUrl: string;
   priceInWei: bigint;
   totalMinted: bigint;
   maxSupply: bigint;
 }
 
+type MintStatus = {
+  message: string;
+  isError: boolean;
+};
+
 export default function FanMintPage() {
   const { address, chain } = useAccount();
   const [arts, setArts] = useState<Art[]>([]);
-
   const [copiedAddress, setCopiedAddress] = useState<string | null>(null);
+  const [mintStatuses, setMintStatuses] = useState<{
+    [key: number]: MintStatus;
+  }>({});
 
   const handleCopyAddress = (address: string) => {
     navigator.clipboard.writeText(address);
@@ -36,10 +43,9 @@ export default function FanMintPage() {
   };
 
   const shortenAddress = (address: string) => {
-    if (address.length <= 10) return address;
-    return `${address.substring(0, 6)}...${address.substring(
-      address.length - 4
-    )}`;
+    return address.length <= 10
+      ? address
+      : `${address.substring(0, 6)}...${address.substring(address.length - 4)}`;
   };
 
   const { data: nextArtIdData } = useReadContracts({
@@ -61,9 +67,7 @@ export default function FanMintPage() {
     args: [BigInt(i)],
   }));
 
-  const { data: artsData } = useReadContracts({
-    contracts,
-  });
+  const { data: artsData } = useReadContracts({ contracts });
 
   useEffect(() => {
     if (artsData) {
@@ -77,7 +81,7 @@ export default function FanMintPage() {
             artistName: result[1],
             artistWallet: result[2],
             mediaUrl: result[3],
-            previewImage: result[4],
+            previewUrl: result[4],
             priceInWei: BigInt(result[5]),
             totalMinted: BigInt(result[6]),
             maxSupply: BigInt(result[7]),
@@ -89,9 +93,50 @@ export default function FanMintPage() {
     }
   }, [artsData]);
 
-  const handleOnStatus = useCallback((status: any) => {
-    console.log("Minting status:", status);
+  const handleOnStatus = useCallback((status: any, artIndex: number) => {
+    let message = "";
+    let isError = false;
+
+    switch (status) {
+      case "transaction-failed":
+        message = "Transaction failed. Please try again.";
+        isError = true;
+        break;
+      case "success":
+        message = "Mint successful!";
+        isError = false;
+        break;
+      case "insufficient-funds":
+        message = "Insufficient funds for transaction.";
+        isError = true;
+        break;
+      default:
+        return;
+    }
+
+    setMintStatuses((prev) => ({
+      ...prev,
+      [artIndex]: { message, isError },
+    }));
+
+    if (!isError) {
+      setTimeout(() => {
+        setMintStatuses((prev) => {
+          const newStatuses = { ...prev };
+          delete newStatuses[artIndex];
+          return newStatuses;
+        });
+      }, 5000);
+    }
   }, []);
+
+  const getImageUrl = (url: string) => {
+    if (!url) return "";
+    // Convert IPFS URLs if needed
+    return url.startsWith("ipfs://")
+      ? `https://ipfs.io/ipfs/${url.replace("ipfs://", "")}`
+      : url;
+  };
 
   return (
     <div className="py-10 space-y-8 px-4 sm:px-6 w-full max-w-screen-lg mx-auto">
@@ -101,9 +146,10 @@ export default function FanMintPage() {
 
       <div className="space-y-6">
         {arts.map((art, index) => {
-          const imageUrl = art.previewImage.startsWith("ipfs://")
-            ? art.previewImage.replace("ipfs://", "https://ipfs.io/ipfs/")
-            : art.previewImage;
+          const imageUrl = art.previewUrl
+            ? getImageUrl(art.previewUrl)
+            : getImageUrl(art.mediaUrl);
+          const status = mintStatuses[index];
 
           return (
             <div
@@ -129,11 +175,21 @@ export default function FanMintPage() {
               </p>
 
               <div className="w-full h-64 sm:h-96 overflow-hidden rounded-md">
-                <img
-                  src={imageUrl}
-                  alt={art.title}
-                  className="w-full h-full object-cover rounded-md"
-                />
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt={art.title}
+                    className="w-full h-full object-cover rounded-md"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src =
+                        "/placeholder-image.png";
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gray-800 flex items-center justify-center rounded-md">
+                    <span className="text-gray-400">No media available</span>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col sm:flex-row justify-between text-sm text-gray-400 gap-2">
@@ -147,10 +203,20 @@ export default function FanMintPage() {
                 </p>
               </div>
 
+              {status && (
+                <div
+                  className={`text-sm ${
+                    status.isError ? "text-red-500" : "text-green-500"
+                  }`}
+                >
+                  {status.message}
+                </div>
+              )}
+
               {address && (
                 <Transaction
                   chainId={chain?.id}
-                  onStatus={handleOnStatus}
+                  onStatus={(status) => handleOnStatus(status, index)}
                   calls={[
                     {
                       address: groupieContractAddress,
@@ -162,7 +228,7 @@ export default function FanMintPage() {
                   ]}
                 >
                   <TransactionButton
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold"
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
                     text="Mint Collectible"
                   />
                   <TransactionStatus className="mt-2 text-xs text-gray-400">
