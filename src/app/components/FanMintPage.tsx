@@ -90,7 +90,7 @@ export default function FanMintPage() {
   }, [artsData]);
 
   const handleOnStatus = useCallback((status: any) => {
-    console.log("Minted status:", status);
+    console.log("Minting status:", status);
   }, []);
 
   return (
