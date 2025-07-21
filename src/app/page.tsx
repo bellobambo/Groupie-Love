@@ -212,7 +212,7 @@ export default function UploadArtForm() {
             {/* Any File Upload */}
             <div className="space-y-1">
               <label className="text-xs font-medium text-[#007FFF]">
-                Attach a File (you can upload the preview if no extra file)
+                Attach a File (upload preview if no extra file)
               </label>
               <input
                 type="file"
