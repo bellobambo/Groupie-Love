@@ -395,7 +395,7 @@ export default function MyCollectibles() {
           <p className="text-gray-500">Mint an NFT to start your collection</p>
         </div>
       ) : (
-        <div className=" gap-6">
+        <div className=" space-y-6">
           {ownedArts.map(({ art, ownedCount, artId }, index) => {
             const inputs = transferInputs[artId.toString()] || {
               toAddress: "",

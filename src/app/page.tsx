@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Transaction,
   TransactionButton,
@@ -30,6 +30,7 @@ import { groupieContractABI, groupieContractAddress } from "./GroupieABI";
 import { parseEther } from "viem";
 import FanMintPage from "./components/FanMintPage";
 import MyCollectibles from "./components/MyCollectibles";
+import { useMiniKit } from "@coinbase/onchainkit/minikit";
 
 const BASE_SEPOLIA_CHAIN_ID = 84532;
 
@@ -103,12 +104,20 @@ export default function UploadArtForm() {
     }
   }, []);
 
+  const { setFrameReady, isFrameReady } = useMiniKit();
+
+  useEffect(() => {
+    if (!isFrameReady) {
+      setFrameReady();
+    }
+  }, [setFrameReady, isFrameReady]);
+
   return (
     <div className="w-full max-w-screen-sm sm:max-w-screen-md md:max-w-screen-lg lg:max-w-[40%] px-4 sm:px-6 mx-auto space-y-8">
       {/* Wallet connection */}
       {!address && (
         <p className="text-sm sm:text-[15px] text-white mt-[3rem] font-semibold font-georgia text-center sm:text-right">
-          Connect Wallet to show some Groupiee Love 💙!
+          Connect Wallet to show some Groupie Love 💙!
         </p>
       )}
       <br />
