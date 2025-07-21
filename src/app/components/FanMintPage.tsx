@@ -269,29 +269,30 @@ export default function FanMintPage() {
                   </Transaction>
                 )}
 
-                {address && (
-                  <Transaction
-                    chainId={chain?.id}
-                    onStatus={(status) => handleOnStatus(status, index)}
-                    calls={[
-                      {
-                        address: groupieContractAddress,
-                        abi: groupieContractABI,
-                        functionName: "burnArt",
-                        args: [BigInt(index), BigInt(1)],
-                      },
-                    ]}
-                  >
-                    <TransactionButton
-                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
-                      text=" Burn Collectible"
-                    />
-                    <TransactionStatus className="mt-2 text-xs text-gray-400">
-                      <TransactionStatusLabel />
-                      <TransactionStatusAction />
-                    </TransactionStatus>
-                  </Transaction>
-                )}
+                <Transaction
+                  chainId={chain?.id}
+                  onStatus={(status) => handleOnStatus(status, index)}
+                  calls={[
+                    {
+                      address: groupieContractAddress,
+                      abi: groupieContractABI,
+                      functionName: "burnArt",
+                      args: [BigInt(index), BigInt(1)],
+                    },
+                  ]}
+                >
+                  <TransactionButton
+                    className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
+                    text=" Burn Collectible"
+                    disabled={
+                      address?.toLowerCase() !== art.artistWallet.toLowerCase()
+                    }
+                  />
+                  <TransactionStatus className="mt-2 text-xs text-gray-400">
+                    <TransactionStatusLabel />
+                    <TransactionStatusAction />
+                  </TransactionStatus>
+                </Transaction>
               </div>
             </div>
           );
