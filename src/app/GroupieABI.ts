@@ -1,5 +1,5 @@
 export const groupieContractAddress =
-  "0xA8e2D0949d6A3457CE4bf128aC754Fc9fcc0970E" as `0x${string}`;
+  "0x4d23c144e36E9fe0443D2aC25E4Ebe0Ff80dD8Cd" as `0x${string}`;
 
 export const groupieContractABI = [
   {
@@ -338,6 +338,24 @@ export const groupieContractABI = [
       },
     ],
     stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [
+      {
+        internalType: "uint256",
+        name: "_artId",
+        type: "uint256",
+      },
+      {
+        internalType: "uint256",
+        name: "_amount",
+        type: "uint256",
+      },
+    ],
+    name: "burnArt",
+    outputs: [],
+    stateMutability: "nonpayable",
     type: "function",
   },
   {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useAccount, useReadContracts } from "wagmi";
+import { useAccount, useReadContracts, useReadContract } from "wagmi";
 import { formatEther } from "viem";
 import { groupieContractABI, groupieContractAddress } from "../GroupieABI";
 import {
@@ -35,6 +35,7 @@ export default function FanMintPage() {
   const [mintStatuses, setMintStatuses] = useState<{
     [key: number]: MintStatus;
   }>({});
+  const [ownership, setOwnership] = useState<{ [key: number]: boolean }>({});
 
   const handleCopyAddress = (address: string) => {
     navigator.clipboard.writeText(address);
@@ -68,6 +69,27 @@ export default function FanMintPage() {
   }));
 
   const { data: artsData } = useReadContracts({ contracts });
+
+  // Check ownership for all arts when address or arts change
+  useEffect(() => {
+    const checkOwnership = async () => {
+      if (!address || !arts.length) return;
+
+      const newOwnership: { [key: number]: boolean } = {};
+      for (let i = 0; i < arts.length; i++) {
+        const { data: balance } = await useReadContract({
+          address: groupieContractAddress,
+          abi: groupieContractABI,
+          functionName: "balanceOf",
+          args: [address, BigInt(i)],
+        });
+        newOwnership[i] = (balance || BigInt(0)) > BigInt(0);
+      }
+      setOwnership(newOwnership);
+    };
+
+    checkOwnership();
+  }, [address, arts]);
 
   useEffect(() => {
     if (artsData) {
@@ -103,7 +125,8 @@ export default function FanMintPage() {
         isError = true;
         break;
       case "success":
-        message = "Mint successful!";
+        message =
+          status === "burnArt" ? "Burn successful!" : "Mint successful!";
         isError = false;
         break;
       case "insufficient-funds":
@@ -143,7 +166,14 @@ export default function FanMintPage() {
       <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF]">
         Available Fan Collectibles
       </h2>
-
+      <div className="flex justify-start">
+        <button
+          onClick={() => window.location.reload()}
+          className="mb-4  py-2 bg-gray-800 hover:bg-gray-700 text-white rounded-md underline"
+        >
+          Refresh
+        </button>
+      </div>
       <div className="space-y-6">
         {arts.map((art, index) => {
           const imageUrl = art.previewUrl
@@ -213,30 +243,56 @@ export default function FanMintPage() {
                 </div>
               )}
 
-              {address && (
-                <Transaction
-                  chainId={chain?.id}
-                  onStatus={(status) => handleOnStatus(status, index)}
-                  calls={[
-                    {
-                      address: groupieContractAddress,
-                      abi: groupieContractABI,
-                      functionName: "mintArt",
-                      args: [BigInt(index), BigInt(1)],
-                      value: art.priceInWei,
-                    },
-                  ]}
-                >
-                  <TransactionButton
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
-                    text="Mint Collectible"
-                  />
-                  <TransactionStatus className="mt-2 text-xs text-gray-400">
-                    <TransactionStatusLabel />
-                    <TransactionStatusAction />
-                  </TransactionStatus>
-                </Transaction>
-              )}
+              <div className="flex  sm:flex-row gap-2">
+                {address && (
+                  <Transaction
+                    chainId={chain?.id}
+                    onStatus={(status) => handleOnStatus(status, index)}
+                    calls={[
+                      {
+                        address: groupieContractAddress,
+                        abi: groupieContractABI,
+                        functionName: "mintArt",
+                        args: [BigInt(index), BigInt(1)],
+                        value: art.priceInWei,
+                      },
+                    ]}
+                  >
+                    <TransactionButton
+                      className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
+                      text="Mint Collectible"
+                    />
+                    <TransactionStatus className="mt-2 text-xs text-gray-400">
+                      <TransactionStatusLabel />
+                      <TransactionStatusAction />
+                    </TransactionStatus>
+                  </Transaction>
+                )}
+
+                {address && (
+                  <Transaction
+                    chainId={chain?.id}
+                    onStatus={(status) => handleOnStatus(status, index)}
+                    calls={[
+                      {
+                        address: groupieContractAddress,
+                        abi: groupieContractABI,
+                        functionName: "burnArt",
+                        args: [BigInt(index), BigInt(1)],
+                      },
+                    ]}
+                  >
+                    <TransactionButton
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-2 rounded-md font-semibold disabled:opacity-50"
+                      text=" Burn Collectible"
+                    />
+                    <TransactionStatus className="mt-2 text-xs text-gray-400">
+                      <TransactionStatusLabel />
+                      <TransactionStatusAction />
+                    </TransactionStatus>
+                  </Transaction>
+                )}
+              </div>
             </div>
           );
         })}

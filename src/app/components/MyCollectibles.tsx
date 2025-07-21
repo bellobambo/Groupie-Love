@@ -346,7 +346,7 @@ export default function MyCollectibles() {
   }, [ownedArts, transferInputs]);
 
   return (
-    <div className="py-10 space-y-8 w-full px-4 sm:px-6 max-w-screen-lg mx-auto">
+    <div className="py-10 space-y-8 px-4 sm:px-6 w-full max-w-screen-lg mx-auto">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h2 className="text-2xl sm:text-3xl font-bold text-[#007FFF]">
           My Collectibles
@@ -354,7 +354,7 @@ export default function MyCollectibles() {
         <button
           onClick={refreshData}
           disabled={isRefreshing}
-          className="px-4 py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center gap-2"
+          className=" py-2 bg-[#007FFF] text-white rounded hover:bg-[#0066cc] disabled:bg-[#A0C4FF] flex items-center gap-2"
         >
           {isRefreshing ? (
             <svg
@@ -378,7 +378,7 @@ export default function MyCollectibles() {
               ></path>
             </svg>
           ) : (
-            <>Refresh</>
+            <div className="underline">Refresh</div>
           )}
         </button>
       </div>
@@ -395,7 +395,7 @@ export default function MyCollectibles() {
           <p className="text-gray-500">Mint an NFT to start your collection</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className=" gap-6">
           {ownedArts.map(({ art, ownedCount, artId }, index) => {
             const inputs = transferInputs[artId.toString()] || {
               toAddress: "",
