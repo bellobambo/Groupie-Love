@@ -8,13 +8,35 @@ import { cookieToInitialState } from "wagmi";
 import { getConfig } from "./wagmi";
 import { Providers } from "./Providers";
 import Header from "./components/Header";
+import { MiniKitContextProvider } from "./MiniKitProvider";
 
 const inter = Space_Grotesk({ subsets: ["latin"], weight: ["400"] });
 
-export const metadata: Metadata = {
-  title: "Groupie Love",
-  description: "Support your favorite creatives",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const URL = process.env.NEXT_PUBLIC_URL;
+  return {
+    title: "Groupie Love",
+    description: "Support your favorite creatives",
+    other: {
+      "fc:frame": JSON.stringify({
+        version: "next",
+        imageUrl:
+          "https://aqua-junior-bobolink-189.mypinata.cloud/ipfs/bafybeidqul6eombbz5hx2xv7qpbkfkujf7oaas5kwjpujckjkpijb2fxuy",
+        button: {
+          title: `Launch ${process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME}`,
+          action: {
+            type: "launch_frame",
+            name: process.env.NEXT_PUBLIC_ONCHAINKIT_PROJECT_NAME,
+            url: URL,
+            splashImageUrl: process.env.NEXT_PUBLIC_SPLASH_IMAGE,
+            splashBackgroundColor:
+              process.env.NEXT_PUBLIC_SPLASH_BACKGROUND_COLOR,
+          },
+        },
+      }),
+    },
+  };
+}
 
 export default async function RootLayout(props: { children: ReactNode }) {
   const headersList = await headers();
@@ -35,7 +57,9 @@ export default async function RootLayout(props: { children: ReactNode }) {
       >
         <Header />
         <Providers initialState={initialState}>
-          <main className="flex-1 overflow-y-auto">{props.children}</main>
+          <MiniKitContextProvider>
+            <main className="flex-1 overflow-y-auto">{props.children}</main>
+          </MiniKitContextProvider>
         </Providers>
       </body>
     </html>
