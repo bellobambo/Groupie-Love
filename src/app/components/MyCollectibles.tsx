@@ -531,7 +531,7 @@ export default function MyCollectibles() {
                         : "border-gray-300"
                     } border`}
                   />
-
+<div></div>
                   <Transaction
                     chainId={BASE_SEPOLIA_CHAIN_ID}
                     calls={calls}
